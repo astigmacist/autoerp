@@ -15,7 +15,15 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="django-insecure-change-me-in-prod")
+_FALLBACK_SECRET_KEY = "django-insecure-change-me-in-prod"
+# `or` (not just `default=`) because django-environ's default only kicks in
+# when the var is entirely absent — if it's present but blank (e.g. a
+# platform's build step scopes/strips it differently from the runtime, as
+# seen on Vercel: collectstatic ran during build with SECRET_KEY="" even
+# though it's set for the project), env() happily returns "", and
+# rest_framework_simplejwt reads settings.SECRET_KEY at import time, so an
+# empty value crashes the entire build before it even gets to run.
+SECRET_KEY = env("SECRET_KEY", default=_FALLBACK_SECRET_KEY) or _FALLBACK_SECRET_KEY
 DEBUG = env.bool("DEBUG", default=True)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
