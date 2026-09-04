@@ -38,6 +38,15 @@ if os.environ.get("VERCEL"):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # Belt-and-suspenders against DisallowedHost (django's generic, message-less
+    # "Bad Request (400)" for EVERY request, including /api/health/, with
+    # DEBUG=False — easy to mistake for an app bug). If the ALLOWED_HOSTS env
+    # var on Vercel ends up wrong (e.g. someone bulk-copied .env.example,
+    # whose ALLOWED_HOSTS is the placeholder "erp.your-domain.kz,localhost,
+    # 127.0.0.1" — none of which match "<project>.vercel.app"), the demo
+    # would 400 on literally everything with no clue why. Always accept the
+    # actual Vercel hostname regardless of what ALLOWED_HOSTS is set to.
+    ALLOWED_HOSTS.append(".vercel.app")
 
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")

@@ -89,6 +89,8 @@ python manage.py recalc_stock   # пересчитывает Stock из журн
 | `SECRET_KEY` | любая длинная случайная строка (не используйте значение по умолчанию из `.env.example`) |
 | `DEBUG` | `False` |
 
+**Не копируйте остальные переменные из `.env.example` в Vercel как есть** — в частности `ALLOWED_HOSTS` там равен плейсхолдеру `erp.your-domain.kz,localhost,127.0.0.1`, который не совпадёт с реальным доменом `*.vercel.app`, и Django будет отвечать `400 Bad Request` (пустая страница, без деталей) на вообще любой запрос — и на логин, и на `/api/health/`. `settings.py` уже подстраховывает это (всегда добавляет `.vercel.app` в `ALLOWED_HOSTS`, если код выполняется на Vercel), но проще вообще не задавать `ALLOWED_HOSTS`/`CORS_ALLOWED_ORIGINS`/`POSTGRES_*` в Vercel — эти переменные из `.env.example` предназначены для `docker-compose`, на Vercel они не нужны.
+
 Затем в Storage → добавьте Postgres (Neon) и подключите к проекту — Vercel сам создаст переменную `DATABASE_URL`, backend подхватит её автоматически (уже настроено в `settings.py` через `django-environ`).
 
 На Vercel нет отдельного шага «выполнить миграции после деплоя» — `config/wsgi.py` сам запускает `migrate` и (по умолчанию) `seed_demo` при первом холодном старте инстанса, идемпотентно. Отключить автозаполнение демо-данными: переменная `AUTOZAP_SEED_DEMO=0`.
