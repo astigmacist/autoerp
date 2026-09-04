@@ -4,8 +4,8 @@
     "backend": { "root": "backend", "entrypoint": "config.wsgi:application" }
   },
   "rewrites": [
-    { "source": "/api(/.*)?", "destination": { "type": "service", "service": "backend" } },
-    { "source": "/admin(/.*)?", "destination": { "type": "service", "service": "backend" } },
-    { "source": "/(.*)", "destination": { "type": "service", "service": "frontend" } }
+    { "source": "/api(/.*)?", "destination": { "service": "backend" } },
+    { "source": "/admin(/.*)?", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
   ]
 }
