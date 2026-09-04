@@ -2,6 +2,7 @@
 Django settings for AutoZap ERP.
 """
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -17,6 +18,27 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-change-me-in-prod")
 DEBUG = env.bool("DEBUG", default=True)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
+
+# --- Vercel (demo hosting) ---
+# Vercel terminates TLS in front of the app and proxies over HTTP, and sets
+# VERCEL_URL (current deployment) / VERCEL_PROJECT_PRODUCTION_URL (stable
+# production domain) automatically. Django 4+ requires an exact-origin
+# allowlist for CSRF (separate from ALLOWED_HOSTS), so without this, POSTing
+# to /admin/login/ (or any session-authenticated form) on a *.vercel.app
+# domain fails with "CSRF verification failed".
+if os.environ.get("VERCEL"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+CSRF_TRUSTED_ORIGINS.append("https://*.vercel.app")
+_vercel_url = env("VERCEL_URL", default="")
+if _vercel_url:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_vercel_url}")
+_vercel_prod_url = env("VERCEL_PROJECT_PRODUCTION_URL", default="")
+if _vercel_prod_url:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{_vercel_prod_url}")
 
 # Application definition
 
@@ -103,7 +125,7 @@ USE_TZ = True
 # Note: no user-uploaded media (product photos etc.) by design — keeps the
 # server's disk footprint small for a boutique-size shop. If that changes
 # later, add MEDIA_URL/MEDIA_ROOT back and an ImageField/FileField on the model.
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
