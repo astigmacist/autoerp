@@ -3,6 +3,29 @@
 :root {
   color-scheme: light dark;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Recharts <Tooltip> renders its own popup outside of any component we
+     control, styled via inline `contentStyle`/`labelStyle`/`itemStyle`
+     props — it doesn't pick up Tailwind's dark: utilities at all, so
+     without this it always shows a plain white box (readable, but visually
+     stuck in light mode). These variables let the chart tooltips follow
+     the same OS-driven dark mode as the rest of the app. */
+  --chart-tooltip-bg: #ffffff;
+  --chart-tooltip-fg: #16171d;
+  --chart-tooltip-border: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --chart-tooltip-bg: #1b1d24;
+    --chart-tooltip-fg: #e5e7eb;
+    --chart-tooltip-border: #33353f;
+  }
+}
+
+.dark {
+  --chart-tooltip-bg: #1b1d24;
+  --chart-tooltip-fg: #e5e7eb;
+  --chart-tooltip-border: #33353f;
 }
 
 * {
@@ -19,6 +42,33 @@ body {
   font-variant-numeric: tabular-nums;
   background: #f6f7f9;
   color: #16171d;
+}
+
+/*
+ * This app has no manual theme toggle (yet) — dark mode is driven purely by
+ * the OS/browser's `prefers-color-scheme`, which is what every `dark:`
+ * Tailwind utility in the app compiles to by default. A `.dark`-class
+ * selector alone is dead code here: nothing in the app ever adds that class
+ * to <html>/<body>, so it never fires.
+ *
+ * That mattered a lot: every plain <input>/<select> in the app relies on
+ * Tailwind's preflight `color: inherit` and has no explicit text-color
+ * class of its own, so its text color is whatever `body`'s computed color
+ * is. With only the (dead) `.dark body` rule below, body's color stayed
+ * permanently `#16171d` (near-black) even with the OS in dark mode, while
+ * those same fields' backgrounds correctly went dark via `dark:bg-*` — near
+ * -black text on a near-black field background, i.e. invisible typed text
+ * everywhere. Mirroring the same colors under the media query fixes the
+ * inherited base for every element that doesn't set its own text color.
+ * The `.dark` rules stay too, so a future manual toggle (see README "Что
+ * дальше") can just add that class and take over from the media query.
+ */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0f1115;
+    color: #e5e7eb;
+  }
+  ::-webkit-scrollbar-thumb { background: #3f414b; }
 }
 
 .dark body {

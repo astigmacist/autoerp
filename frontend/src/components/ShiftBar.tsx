@@ -190,8 +190,8 @@ export default function ShiftBar() {
               <div
                 className={`flex items-center justify-between rounded-xl px-3 py-2 font-semibold ${
                   Math.abs(parseFloat(String(closedResult.cash_diff))) < 0.01
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-red-50 text-red-700'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300'
                 }`}
               >
                 <span className="flex items-center gap-1.5"><Wallet size={14} /> Расхождение</span>

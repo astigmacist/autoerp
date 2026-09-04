@@ -17,7 +17,10 @@ interface DraftLine {
 }
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведено' }
-const STATUS_CLS: Record<string, string> = { draft: 'bg-gray-100 text-gray-500', posted: 'bg-emerald-50 text-emerald-700' }
+const STATUS_CLS: Record<string, string> = {
+  draft: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
+  posted: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300',
+}
 
 export default function WriteOffs() {
   const { data: docs, isLoading } = useWriteOffs()
@@ -126,7 +129,7 @@ export default function WriteOffs() {
                 <td className="px-2 py-2.5"><span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span></td>
                 <td className="px-4 py-2.5 text-right">
                   {d.status === 'draft' && (
-                    <button onClick={() => setConfirmDoc(d)} className="text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg px-2.5 py-1.5">Провести</button>
+                    <button onClick={() => setConfirmDoc(d)} className="text-xs font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg px-2.5 py-1.5">Провести</button>
                   )}
                 </td>
               </tr>

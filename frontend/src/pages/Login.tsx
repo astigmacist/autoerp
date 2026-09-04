@@ -35,7 +35,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="bg-white dark:bg-[#151720] border border-gray-200 dark:border-gray-800 rounded-2xl p-6 space-y-4 shadow-sm">
           {error && (
-            <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>
+            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-sm px-3 py-2">{error}</div>
           )}
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Логин</label>

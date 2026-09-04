@@ -64,12 +64,12 @@ export default function SalesJournal() {
                 <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatMoney(s.total)}</td>
                 <td className="px-4 py-2.5">
                   <span className={`text-xs rounded-full px-2 py-0.5 ${
-                    s.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                    s.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                   }`}>
                     {STATUS_LABELS[s.status] ?? s.status}
                   </span>
                   {s.needs_approval && (
-                    <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-amber-50 text-amber-700">сверхскидка</span>
+                    <span className="ml-1 text-xs rounded-full px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">сверхскидка</span>
                   )}
                 </td>
               </tr>

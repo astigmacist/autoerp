@@ -18,9 +18,9 @@ interface DraftLine {
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведён', cancelled: 'Отменён' }
 const STATUS_CLS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-500',
-  posted: 'bg-emerald-50 text-emerald-700',
-  cancelled: 'bg-red-50 text-red-700',
+  draft: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
+  posted: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300',
+  cancelled: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300',
 }
 
 export default function Transfers() {
@@ -160,7 +160,7 @@ export default function Transfers() {
                 <td className="px-2 py-2.5"><span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_CLS[t.status]}`}>{STATUS_LABELS[t.status]}</span></td>
                 <td className="px-4 py-2.5 text-right">
                   {t.status === 'draft' && (
-                    <button onClick={() => setConfirmDoc(t)} className="text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg px-2.5 py-1.5">Провести</button>
+                    <button onClick={() => setConfirmDoc(t)} className="text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg px-2.5 py-1.5">Провести</button>
                   )}
                 </td>
               </tr>

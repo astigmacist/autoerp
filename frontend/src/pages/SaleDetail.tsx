@@ -84,7 +84,7 @@ export default function SaleDetail() {
             <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{sale.number}</h1>
             <div className="text-sm text-gray-400">{formatDateTime(sale.created_at)} · {sale.seller_name}</div>
           </div>
-          <span className={`text-xs rounded-full px-2.5 py-1 ${sale.status === 'completed' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+          <span className={`text-xs rounded-full px-2.5 py-1 ${sale.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
             {STATUS_LABELS[sale.status] ?? sale.status}
           </span>
         </div>

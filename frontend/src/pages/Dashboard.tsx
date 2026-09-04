@@ -21,7 +21,10 @@ const PAYMENT_LABELS: Record<string, string> = {
   transfer: 'Перевод',
 }
 
-const PAYMENT_COLORS = ['#111827', '#6366f1', '#22c55e', '#f59e0b']
+// Chosen to stay clearly visible against both the light card background
+// (#fff) and the dark one (#151720) — a near-black first color (the
+// original #111827) all but disappeared against the dark card.
+const PAYMENT_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899']
 
 function StatCard({
   label, value, change, accent,
@@ -89,15 +92,23 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height={240}>
                 <AreaChart data={data.period_revenue_by_day}>
                   <defs>
+                    {/* #6366f1 (indigo-500) instead of the original near-black
+                        #111827 — that stroke/fill all but vanished against the
+                        dark card background (#151720) in dark mode. */}
                     <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#111827" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#111827" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={40} />
-                  <Tooltip formatter={(v: any) => formatMoney(v)} />
-                  <Area type="monotone" dataKey="revenue" stroke="#111827" fill="url(#rev)" strokeWidth={2} />
+                  <Tooltip
+                    formatter={(v: any) => formatMoney(v)}
+                    contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: 12, fontSize: 13 }}
+                    labelStyle={{ color: 'var(--chart-tooltip-fg)' }}
+                    itemStyle={{ color: 'var(--chart-tooltip-fg)' }}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#rev)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -115,7 +126,12 @@ export default function Dashboard() {
                           <Cell key={i} fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v: any) => formatMoney(v)} />
+                      <Tooltip
+                        formatter={(v: any) => formatMoney(v)}
+                        contentStyle={{ background: 'var(--chart-tooltip-bg)', border: '1px solid var(--chart-tooltip-border)', borderRadius: 12, fontSize: 13 }}
+                        labelStyle={{ color: 'var(--chart-tooltip-fg)' }}
+                        itemStyle={{ color: 'var(--chart-tooltip-fg)' }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-1.5 mt-2">
@@ -173,7 +189,7 @@ export default function Dashboard() {
           {data.deficit_count > 0 && (
             <Link
               to="/stock?low_stock=true"
-              className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm font-medium hover:bg-red-100 transition-colors"
+              className="flex items-center gap-2 rounded-2xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 px-4 py-3 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
             >
               <AlertTriangle size={18} />
               {data.deficit_count} товаров с дефицитом на витрине — нажмите, чтобы посмотреть

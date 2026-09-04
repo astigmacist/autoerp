@@ -96,7 +96,7 @@ export default function Layout() {
                   onClick={() => setMobileOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium ${
-                      isActive ? 'bg-gray-900 text-white' : 'text-gray-600 dark:text-gray-300'
+                      isActive ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900' : 'text-gray-600 dark:text-gray-300'
                     }`
                   }
                 >
