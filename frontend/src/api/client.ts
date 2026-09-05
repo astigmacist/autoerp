@@ -17,8 +17,21 @@ export const tokenStore = {
   },
 }
 
+// Фронтенд и бэкенд живут в двух разных проектах Vercel, поэтому в продакшене
+// API находится на другом домене. Адрес бэкенда задаётся переменной
+// VITE_API_URL в настройках фронтенд-проекта (например,
+// https://autoerp-api.vercel.app). Если переменная не задана, запросы идут на
+// тот же домен — именно это нужно и локально (dev-сервер Vite проксирует /api
+// на 127.0.0.1:8000), и если API проброшен через rewrite в vercel.json.
+//
+// Важно: Vite подставляет значение переменной на этапе сборки, а не в рантайме,
+// поэтому после добавления VITE_API_URL проект нужно передеплоить.
+const API_ROOT = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
+
+export const API_BASE = `${API_ROOT}/api/v1`
+
 export const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE,
 })
 
 api.interceptors.request.use((config) => {
@@ -35,7 +48,7 @@ async function doRefresh(): Promise<string | null> {
   const refresh = tokenStore.getRefresh()
   if (!refresh) return null
   try {
-    const { data } = await axios.post('/api/v1/auth/refresh/', { refresh })
+    const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh })
     tokenStore.setAccess(data.access)
     return data.access
   } catch {

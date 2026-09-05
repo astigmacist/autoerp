@@ -1,0 +1,14 @@
+# Vercel собирает бэкенд как Python/Django (обнаруживает manage.py).
+# Dockerfile нужен только для docker-compose-варианта деплоя — если оставить
+# его здесь, Vercel может попытаться собрать образ вместо Django-приложения.
+Dockerfile
+entrypoint.sh
+
+# Локальный мусор: без этого `vercel` CLI пытается загрузить venv целиком.
+venv/
+.venv/
+__pycache__/
+*.pyc
+db.sqlite3
+# staticfiles/ собирается самим Vercel на этапе сборки (collectstatic)
+staticfiles/

@@ -5,6 +5,16 @@ It exposes the WSGI callable as a module-level variable named ``application``.
 
 For more information on this file, see
 https://docs.djangoproject.com/en/5.0/howto/deployment/wsgi/
+
+Vercel находит этот модуль само — по `WSGI_APPLICATION` в настройках (см.
+документацию «Deploy a Django app on Vercel»), поэтому никакой отдельный
+entrypoint в конфиге не нужен.
+
+Миграции здесь НЕ запускаются: они выполняются на этапе сборки в
+`vercel_build.py`. Раньше `migrate` вызывался прямо отсюда, при холодном
+старте, и это молча ломало демо — на read-only файловой системе Vercel
+миграции падали, ошибка уходила в лог, а приложение продолжало работать
+с нерабочей базой и отвечало 500 на каждый запрос.
 """
 
 import os
@@ -14,21 +24,3 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 application = get_wsgi_application()
-
-# On Vercel there is no build-time hook to run `migrate` (and no persistent
-# disk / server to SSH into and run it by hand), so we run it once per cold
-# start here instead. Both `migrate` and `seed_demo` are idempotent, so this
-# is a cheap no-op on every warm/subsequent instance. Wrapped defensively so
-# a migration hiccup logs instead of taking the whole app down.
-if os.environ.get("VERCEL"):
-    import logging
-
-    from django.core.management import call_command
-
-    logger = logging.getLogger("autozap.startup")
-    try:
-        call_command("migrate", interactive=False, verbosity=0)
-        if os.environ.get("AUTOZAP_SEED_DEMO", "1") == "1":
-            call_command("seed_demo", verbosity=0)
-    except Exception:
-        logger.exception("Startup migrate/seed_demo failed")

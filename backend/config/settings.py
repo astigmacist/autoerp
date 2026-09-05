@@ -116,12 +116,17 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
-DATABASES = {
-    "default": env.db(
-        "DATABASE_URL",
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-    )
-}
+# Хостинг-интеграции (в т.ч. Postgres/Neon на Vercel) кладут строку подключения
+# в DATABASE_URL, некоторые — ещё и в POSTGRES_URL; принимаем оба имени.
+# SQLite остаётся только для локальной разработки: на Vercel файловая система
+# функции доступна только на чтение, поэтому «тихий» откат на SQLite там дал бы
+# приложение, которое открывается, но не может записать ни одной продажи.
+_database_url = (
+    env("DATABASE_URL", default="")
+    or env("POSTGRES_URL", default="")
+    or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+)
+DATABASES = {"default": env.db_url_config(_database_url)}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -188,6 +193,12 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5173", "http://127.0.0.1:5173"],
 )
+# Фронтенд и бэкенд деплоятся как два отдельных проекта Vercel, поэтому в
+# продакшене SPA обращается к API с другого домена. Точный список доменов вести
+# бессмысленно: каждый preview-деплой получает новый поддомен *.vercel.app, и
+# любой из них должен работать. Для демо разрешаем любой поддомен vercel.app —
+# на реальном домене оставьте только его (переменная CORS_ALLOWED_ORIGINS).
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://[A-Za-z0-9-]+\.vercel\.app$"]
 CORS_ALLOW_CREDENTIALS = True
 
 # --- AutoZap business settings (defaults, overridable in Settings model) ---
