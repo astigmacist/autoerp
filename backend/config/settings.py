@@ -3,6 +3,7 @@ Django settings for AutoZap ERP.
 """
 
 import os
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 
@@ -24,7 +25,10 @@ _FALLBACK_SECRET_KEY = "django-insecure-change-me-in-prod"
 # rest_framework_simplejwt reads settings.SECRET_KEY at import time, so an
 # empty value crashes the entire build before it even gets to run.
 SECRET_KEY = env("SECRET_KEY", default=_FALLBACK_SECRET_KEY) or _FALLBACK_SECRET_KEY
-DEBUG = env.bool("DEBUG", default=True)
+# Локально удобен DEBUG=True, но на хостинге он недопустим — поэтому там
+# значение по умолчанию переворачивается. Отдельную переменную окружения
+# для этого заводить не нужно.
+DEBUG = env.bool("DEBUG", default=not bool(os.environ.get("VERCEL")))
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
 # --- Vercel (demo hosting) ---
@@ -93,6 +97,8 @@ MIDDLEWARE = [
     "simple_history.middleware.HistoryRequestMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Показывает внятную страницу вместо голого 500, если база недоступна.
+    "apps.core.middleware.DatabaseUnavailableMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -116,17 +122,32 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
-# Хостинг-интеграции (в т.ч. Postgres/Neon на Vercel) кладут строку подключения
-# в DATABASE_URL, некоторые — ещё и в POSTGRES_URL; принимаем оба имени.
-# SQLite остаётся только для локальной разработки: на Vercel файловая система
-# функции доступна только на чтение, поэтому «тихий» откат на SQLite там дал бы
-# приложение, которое открывается, но не может записать ни одной продажи.
-_database_url = (
-    env("DATABASE_URL", default="")
-    or env("POSTGRES_URL", default="")
-    or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
-)
-DATABASES = {"default": env.db_url_config(_database_url)}
+#
+# Приоритет — внешняя база: хостинг-интеграции (Postgres/Neon на Vercel)
+# кладут строку подключения в DATABASE_URL, некоторые — ещё и в POSTGRES_URL.
+# Подключили базу в панели — приложение само её подхватит, менять код не нужно.
+#
+# Если внешней базы нет, работает SQLite. На Vercel каталог с кодом доступен
+# только на чтение, поэтому файл базы кладётся во временный каталог (TMPDIR,
+# обычно /tmp) — единственное место, куда функции разрешено писать. Такая база
+# живёт до перезапуска экземпляра: для показа демо этого достаточно, для
+# постоянного хранения — подключите Postgres (см. README).
+_database_url = env("DATABASE_URL", default="") or env("POSTGRES_URL", default="")
+
+# Готовый файл базы, который собирается на этапе сборки (vercel_build.py):
+# при старте он копируется во временный каталог, чтобы не выполнять миграции
+# на первом запросе.
+SQLITE_SEED_PATH = BASE_DIR / "db_seed.sqlite3"
+
+if _database_url:
+    DATABASES = {"default": env.db_url_config(_database_url)}
+    SQLITE_RUNTIME_PATH = None
+else:
+    if os.environ.get("VERCEL"):
+        SQLITE_RUNTIME_PATH = Path(tempfile.gettempdir()) / "autozap.sqlite3"
+    else:
+        SQLITE_RUNTIME_PATH = BASE_DIR / "db.sqlite3"
+    DATABASES = {"default": env.db_url_config(f"sqlite:///{SQLITE_RUNTIME_PATH}")}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -149,9 +170,21 @@ USE_TZ = True
 # later, add MEDIA_URL/MEDIA_ROOT back and an ImageField/FileField on the model.
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Собранный фронтенд лежит в backend/spa/ (папка коммитится в репозиторий,
+# пересобирается командой `npm run build:demo`). Он попадает в статику обычным
+# collectstatic, поэтому на хостинге раздаётся с CDN, а не через Python.
+# Именно это позволяет держать весь проект одним деплоем: Django отдаёт и API,
+# и интерфейс.
+SPA_DIR = BASE_DIR / "spa"
+STATICFILES_DIRS = [SPA_DIR] if SPA_DIR.exists() else []
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    # Без «манифестного» варианта: Vite уже добавляет хеш в имена файлов, а
+    # ManifestStaticFilesStorage при любой недостающей ссылке внутри CSS/JS
+    # роняет collectstatic целиком — лишний способ сломать деплой на ровном месте.
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -1,44 +1,54 @@
-"""Шаг сборки бэкенда на Vercel.
+"""Шаг сборки на хостинге (Vercel запускает его через buildCommand).
 
-Vercel запускает этот файл через "buildCommand" из vercel.json — после
-установки requirements.txt и до того, как приложение упакуется в Vercel
-Function.
+Задача — сделать так, чтобы первый же запрос к приложению отвечал сразу, а не
+тратил время на миграции:
 
-Это единственное место в деплое на Vercel, где можно выполнить миграции:
-во время обработки запросов файловая система функции доступна только на
-чтение, а «зайти на сервер и выполнить manage.py migrate» здесь негде.
-collectstatic вызывать не нужно — Vercel делает это сам (см. документацию
-«Deploy a Django app on Vercel» → Serving static assets).
+* если подключена внешняя база (DATABASE_URL / POSTGRES_URL) — накатываем на
+  неё миграции и демо-данные прямо здесь, во время сборки. Это единственный
+  момент, когда на serverless-хостинге вообще можно выполнить миграции;
+* если внешней базы нет — собираем готовый файл SQLite (`db_seed.sqlite3`),
+  который при старте копируется во временный каталог.
+
+collectstatic вызывать не нужно: Vercel запускает его сам и раздаёт статику
+(включая собранный фронтенд из backend/spa/) со своего CDN.
 """
 
 import os
 import subprocess
 import sys
+from pathlib import Path
 
-BOLD = "\033[1m"
-RESET = "\033[0m"
+BASE_DIR = Path(__file__).resolve().parent
+SEED_PATH = BASE_DIR / "db_seed.sqlite3"
 
-if not (os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")):
-    sys.exit(
-        f"\n{BOLD}Сборка остановлена: не подключена база данных "
-        f"(нет переменной DATABASE_URL).{RESET}\n\n"
-        "Vercel Functions работают на файловой системе только для чтения, поэтому\n"
-        "SQLite здесь не годится — данные будет некуда записывать, и приложение\n"
-        "будет выглядеть работающим, но любая продажа или приход будут падать.\n\n"
-        "Что сделать:\n"
-        "  1. Откройте проект на Vercel → вкладка Storage → Create Database\n"
-        "     → Postgres (Neon) → Connect to Project.\n"
-        "  2. Vercel сам добавит переменную DATABASE_URL в проект.\n"
-        "  3. Deployments → последний деплой → ⋯ → Redeploy.\n"
+external_db = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+
+
+def run(*args: str, env: dict | None = None) -> None:
+    print(f"$ python manage.py {' '.join(args)}", flush=True)
+    subprocess.run([sys.executable, "manage.py", *args], check=True, env=env)
+
+
+if external_db:
+    print("Найдена внешняя база — накатываю миграции на неё.", flush=True)
+    run("migrate", "--noinput")
+    if os.environ.get("AUTOZAP_SEED_DEMO", "1") == "1":
+        run("seed_demo")
+else:
+    print(
+        "Внешняя база не подключена — собираю готовый файл демо-базы.\n"
+        "Данные в таком режиме живут до перезапуска экземпляра. Чтобы они\n"
+        "сохранялись постоянно, подключите Postgres: вкладка Storage →\n"
+        "Create Database → Postgres (Neon) → Connect to Project, затем Redeploy.",
+        flush=True,
     )
-
-
-def run(*args: str) -> None:
-    print(f"\n$ python manage.py {' '.join(args)}", flush=True)
-    subprocess.run([sys.executable, "manage.py", *args], check=True)
-
-
-run("migrate", "--noinput")
-
-if os.environ.get("AUTOZAP_SEED_DEMO", "1") == "1":
-    run("seed_demo")
+    if SEED_PATH.exists():
+        SEED_PATH.unlink()
+    # Сборка идёт на записываемой файловой системе, поэтому файл базы можно
+    # создать прямо здесь и положить рядом с кодом — read-only он станет уже
+    # в задеплоенном приложении, откуда его и копируют во временный каталог.
+    seed_env = {**os.environ, "DATABASE_URL": f"sqlite:///{SEED_PATH}"}
+    run("migrate", "--noinput", env=seed_env)
+    if os.environ.get("AUTOZAP_SEED_DEMO", "1") == "1":
+        run("seed_demo", env=seed_env)
+    print(f"Готово: {SEED_PATH.name} ({SEED_PATH.stat().st_size // 1024} КБ)", flush=True)

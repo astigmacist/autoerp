@@ -24,3 +24,9 @@ from django.core.wsgi import get_wsgi_application
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 application = get_wsgi_application()
+
+# Демо-режим без внешней базы: развернуть SQLite во временном каталоге.
+# Если подключена настоящая база, вызов ничего не делает.
+from config.db_bootstrap import ensure_database  # noqa: E402  (после настройки Django)
+
+ensure_database()

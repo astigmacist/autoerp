@@ -19,3 +19,6 @@ frontend/dist/
 .DS_Store
 .vscode/
 .idea/
+
+# База, которую собирает шаг сборки на хостинге (не коммитится)
+backend/db_seed.sqlite3
