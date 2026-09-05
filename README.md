@@ -23,10 +23,15 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+echo "DEBUG=True" > .env        # только для разработки: подробные ошибки и статика на лету
 python manage.py migrate
 python manage.py seed_demo      # создаёт склады, демо-пользователей и 5 демо-товаров
 python manage.py runserver 0.0.0.0:8000
 ```
+
+`DEBUG` по умолчанию выключен, чтобы случайно запущенный на сервере экземпляр
+не показывал посетителям трассировки. Для локальной работы его включают одной
+строкой в `backend/.env`, как выше.
 
 По умолчанию используется SQLite (файл `backend/db.sqlite3`) — этого достаточно для разработки и первого знакомства с системой. Для продакшена используйте PostgreSQL (см. `docker-compose.yml` и `.env.example`, переменная `DATABASE_URL`).
 
@@ -53,21 +58,75 @@ npm run dev
 
 Откройте http://localhost:5173 — в dev-режиме Vite проксирует все запросы `/api/*` на `http://127.0.0.1:8000` (см. `vite.config.ts`), поэтому backend должен быть запущен параллельно.
 
-## Запуск в продакшене (Docker Compose)
+## Запуск на своём сервере (Docker Compose)
 
 ```bash
 cp .env.example .env
-# отредактируйте .env: SECRET_KEY, ALLOWED_HOSTS, пароль базы данных
-
-docker compose up -d --build
-docker compose exec backend python manage.py createsuperuser
-# либо
-docker compose exec backend python manage.py seed_demo
 ```
 
-Приложение будет доступно на порту 80 (фронтенд + прокси на API). Добавьте Nginx/Caddy с Let's Encrypt перед этим стеком для HTTPS на реальном домене (см. ТЗ §12.1), либо поставьте `docker-compose` за уже существующий reverse proxy.
+Отредактируйте `.env` — это обязательный шаг, без него приложение не запустится:
 
-## Управляющие команды (важно для целостности данных)
+| Переменная | Что поставить |
+|---|---|
+| `SECRET_KEY` | случайная строка: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `DEBUG` | `False` |
+| `ALLOWED_HOSTS` | ваш домен, например `erp.avtozapchasti.kz` |
+| `CORS_ALLOWED_ORIGINS` | `https://` + тот же домен |
+| `POSTGRES_PASSWORD` | свой пароль базы |
+| `USE_HTTPS` | `False` на первом запуске, `True` после того, как заработает сертификат |
+
+```bash
+docker compose up -d --build
+docker compose exec backend python manage.py createsuperuser
+```
+
+Приложение поднимется на порту 80. Миграции и сборка статики выполняются
+автоматически при старте контейнера (`backend/entrypoint.sh`), база —
+PostgreSQL 16 в отдельном контейнере с постоянным томом.
+
+Дальше поставьте перед стеком Nginx или Caddy с сертификатом Let's Encrypt,
+после чего переключите `USE_HTTPS=True` и перезапустите:
+`docker compose up -d`.
+
+### Чек-лист перед первым рабочим днём
+
+1. **Свой `SECRET_KEY`** — приложение не стартует со значением по умолчанию,
+   но проверьте, что подставили именно свой.
+2. **`DEBUG=False`** и `ALLOWED_HOSTS` со своим доменом.
+3. **Демо-пользователей нет.** Команду `seed_demo` на боевом сервере запускать
+   не нужно — она создаёт пользователей с общеизвестными паролями
+   (`owner/owner12345`). Заведите реальных через `createsuperuser` и `/admin/`.
+   Если демо-данные всё-таки попали в базу, удалите этих пользователей.
+4. **HTTPS** включён, `USE_HTTPS=True`.
+5. **Резервные копии настроены** (см. ниже) — это единственное, что нельзя
+   восстановить, если сервер потеряется.
+6. Проверьте `/api/health/` — должен отвечать `{"status": "ok"}`.
+
+### Резервные копии
+
+Для магазина это самое важное после самих данных. Снять копию:
+
+```bash
+docker compose exec -T db pg_dump -U autozap autozap | gzip > autozap-$(date +%F).sql.gz
+```
+
+Восстановить:
+
+```bash
+gunzip -c autozap-2026-09-05.sql.gz | docker compose exec -T db psql -U autozap -d autozap
+```
+
+Ежедневная копия в 3 ночи с хранением 14 дней (`crontab -e` на сервере):
+
+```
+0 3 * * * cd /path/to/project && docker compose exec -T db pg_dump -U autozap autozap | gzip > /var/backups/autozap-$(date +\%F).sql.gz && find /var/backups -name 'autozap-*.sql.gz' -mtime +14 -delete
+```
+
+Копии стоит регулярно уносить с сервера (в облако или на другой диск): копия,
+лежащая рядом с базой, не спасёт при потере сервера. И раз в пару месяцев
+проверяйте, что копия **разворачивается** — непроверенная копия не считается.
+
+### Целостность данных
 
 Согласно ТЗ §5.4/§10.1 остатки (`Stock`) — это кэш, источник истины — журнал движений (`StockMovement`). Для проверки и восстановления целостности:
 

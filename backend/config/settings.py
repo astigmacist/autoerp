@@ -3,11 +3,14 @@ Django settings for AutoZap ERP.
 """
 
 import os
+import sys
 import tempfile
+import warnings
 from datetime import timedelta
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -16,20 +19,63 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+# DEBUG выключен по умолчанию. Раньше он включался везде, где нет признака
+# Vercel, — то есть на обычном сервере без явной настройки приложение
+# показывало бы посетителю трассировки со всеми настройками. Для локальной
+# разработки достаточно один раз положить DEBUG=True в backend/.env.
+DEBUG = env.bool("DEBUG", default=False)
+
 _FALLBACK_SECRET_KEY = "django-insecure-change-me-in-prod"
-# `or` (not just `default=`) because django-environ's default only kicks in
-# when the var is entirely absent — if it's present but blank (e.g. a
-# platform's build step scopes/strips it differently from the runtime, as
-# seen on Vercel: collectstatic ran during build with SECRET_KEY="" even
-# though it's set for the project), env() happily returns "", and
-# rest_framework_simplejwt reads settings.SECRET_KEY at import time, so an
-# empty value crashes the entire build before it even gets to run.
+# `or` (не только `default=`): значение по умолчанию у django-environ
+# срабатывает лишь когда переменной нет совсем. Если она есть, но пустая
+# (так вело себя окружение сборки на Vercel), env() вернёт "", а
+# rest_framework_simplejwt читает SECRET_KEY при импорте — и приложение
+# падает ещё до старта.
 SECRET_KEY = env("SECRET_KEY", default=_FALLBACK_SECRET_KEY) or _FALLBACK_SECRET_KEY
-# Локально удобен DEBUG=True, но на хостинге он недопустим — поэтому там
-# значение по умолчанию переворачивается. Отдельную переменную окружения
-# для этого заводить не нужно.
-DEBUG = env.bool("DEBUG", default=not bool(os.environ.get("VERCEL")))
+
+# Этим ключом подписываются токены входа. Если он останется значением по
+# умолчанию (оно лежит в открытом репозитории), любой сможет подделать токен
+# и войти владельцем. На демо-стенде это допустимо, в бою — нет, поэтому
+# приложение не запустится молча с чужим ключом.
+# Прогон тестов идёт с DEBUG=False (так делает сам Django), и требовать там
+# боевой ключ незачем — проверка касается только запуска приложения.
+_RUNNING_TESTS = "test" in sys.argv
+
+if not DEBUG and not ON_VERCEL and not _RUNNING_TESTS and SECRET_KEY == _FALLBACK_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY не задан. Этим ключом подписываются токены входа, и значение "
+        "по умолчанию известно всем, кто видел репозиторий — с ним можно подделать "
+        "вход под любым пользователем.\n\n"
+        "Сгенерируйте ключ и положите в backend/.env (или в переменные окружения):\n"
+        "  python -c \"import secrets; print(secrets.token_urlsafe(64))\"\n"
+        "  SECRET_KEY=<полученная строка>"
+    )
+
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
+
+if not DEBUG and not ON_VERCEL and not _RUNNING_TESTS and ALLOWED_HOSTS == ["*"]:
+    # Не блокируем запуск (за nginx это не критично), но так предупреждение
+    # видно в логах контейнера, а не теряется.
+    warnings.warn(
+        "ALLOWED_HOSTS не задан — приложение принимает запросы с любым доменом. "
+        "Укажите свой домен в backend/.env: ALLOWED_HOSTS=erp.ваш-домен.kz",
+        RuntimeWarning,
+    )
+
+# --- HTTPS на своём сервере ---
+# Включается одной переменной USE_HTTPS=True, когда перед приложением уже
+# стоит nginx/Caddy с сертификатом. Отдельный флаг нужен потому, что включить
+# это заранее — значит закрыть себе доступ: браузер будет отправлять cookie
+# только по https, а редирект уведёт на адрес, которого ещё нет.
+if env.bool("USE_HTTPS", default=False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 # --- Vercel (demo hosting) ---
 # Vercel terminates TLS in front of the app and proxies over HTTP, and sets
@@ -38,7 +84,7 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 # allowlist for CSRF (separate from ALLOWED_HOSTS), so without this, POSTing
 # to /admin/login/ (or any session-authenticated form) on a *.vercel.app
 # domain fails with "CSRF verification failed".
-if os.environ.get("VERCEL"):
+if ON_VERCEL:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -143,7 +189,7 @@ if _database_url:
     DATABASES = {"default": env.db_url_config(_database_url)}
     SQLITE_RUNTIME_PATH = None
 else:
-    if os.environ.get("VERCEL"):
+    if ON_VERCEL:
         SQLITE_RUNTIME_PATH = Path(tempfile.gettempdir()) / "autozap.sqlite3"
     else:
         SQLITE_RUNTIME_PATH = BASE_DIR / "db.sqlite3"
@@ -231,7 +277,11 @@ CORS_ALLOWED_ORIGINS = env.list(
 # бессмысленно: каждый preview-деплой получает новый поддомен *.vercel.app, и
 # любой из них должен работать. Для демо разрешаем любой поддомен vercel.app —
 # на реальном домене оставьте только его (переменная CORS_ALLOWED_ORIGINS).
-CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://[A-Za-z0-9-]+\.vercel\.app$"]
+# Только на Vercel: там фронтенд может жить на соседнем поддомене, и список
+# точных адресов пришлось бы обновлять на каждый preview-деплой. На своём
+# сервере фронтенд и API на одном домене, и лишних разрешений быть не должно.
+if ON_VERCEL:
+    CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://[A-Za-z0-9-]+\.vercel\.app$"]
 CORS_ALLOW_CREDENTIALS = True
 
 # --- AutoZap business settings (defaults, overridable in Settings model) ---

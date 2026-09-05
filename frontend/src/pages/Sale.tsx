@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Tag } from 'lucide-react'
+import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Percent } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useProductSearch, useWarehouses } from '@/api/queries'
 import { useAuth } from '@/store/auth'
@@ -51,6 +51,8 @@ export default function SalePage() {
   const [submitting, setSubmitting] = useState(false)
   const [idempotencyKey, setIdempotencyKey] = useState(uuid())
   const [customerReceived, setCustomerReceived] = useState<string>('')
+  /** У какой позиции сейчас раскрыты быстрые скидки. */
+  const [discountFor, setDiscountFor] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -171,7 +173,7 @@ export default function SalePage() {
 
       <div className="space-y-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-muted" size={18} />
           <input
             ref={searchRef}
             value={query}
@@ -184,12 +186,12 @@ export default function SalePage() {
 
         {query.trim().length >= 2 && (
           <div className="rounded-2xl border border-line bg-surface divide-y divide-line max-h-80 overflow-y-auto">
-            {results?.length === 0 && <div className="p-4 text-sm text-gray-400">Ничего не найдено</div>}
+            {results?.length === 0 && <div className="p-4 text-sm text-fg-muted">Ничего не найдено</div>}
             {results?.map((p) => (
               <button
                 key={p.id}
                 onClick={() => addToCart(p)}
-                className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-3"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-muted"
               >
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-fg truncate">{p.name}</div>
@@ -220,116 +222,134 @@ export default function SalePage() {
               const pct = discountPercent(base, l.finalPrice)
               const hasDiscount = pct > 0
               const overLimit = isOverLimit(l)
+              const discountOpen = discountFor === l.product.id
               return (
                 <div
                   key={l.product.id}
-                  className={`rounded-2xl border bg-surface p-3 sm:p-4 ${
-                    overLimit
-                      ? 'border-amber-300 dark:border-amber-800'
-                      : 'border-line'
+                  className={`rounded-2xl border bg-surface p-3 shadow-card transition-colors ${
+                    overLimit ? 'border-amber-300 dark:border-amber-800' : 'border-line'
                   }`}
                 >
+                  {/* Строка товара: название и всё управление — в две строки.
+                      Раньше каждая позиция занимала пять рядов с подписями и
+                      четырьмя кнопками скидок; в зале это лишний шум, а скидка
+                      нужна не в каждой продаже. Теперь она под кнопкой «%». */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium text-fg">{l.product.name}</div>
-                      <div className="text-xs text-gray-400">{l.product.sku}</div>
+                      <div className="font-medium leading-snug text-fg">{l.product.name}</div>
+                      <div className="text-xs text-fg-muted">{l.product.sku}</div>
                     </div>
                     <button
                       onClick={() => removeLine(l.product.id)}
                       aria-label="Убрать из корзины"
-                      className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                      className="-mt-1 -mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-fg-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                     >
                       <Trash2 size={16} />
                     </button>
                   </div>
 
-                  {/* На телефоне два поля делят ширину пополам, на большом
-                      экране растягивать их на пол-карточки незачем. */}
-                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-[11rem_13rem] gap-3">
-                    <div>
-                      <div className="text-xs text-fg-muted mb-1">Количество</div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateQty(l.product.id, l.quantity - 1)}
-                          aria-label="Меньше"
-                          className="h-10 w-10 shrink-0 rounded-xl border border-line-strong flex items-center justify-center text-gray-600 dark:text-gray-300"
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <input
-                          inputMode="decimal"
-                          value={l.quantity}
-                          onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
-                          className="w-full min-w-0 h-10 text-center rounded-xl border border-line-strong bg-transparent outline-none tabular-nums text-fg"
-                        />
-                        <button
-                          onClick={() => updateQty(l.product.id, l.quantity + 1)}
-                          aria-label="Больше"
-                          className="h-10 w-10 shrink-0 rounded-xl border border-line-strong flex items-center justify-center text-gray-600 dark:text-gray-300"
-                        >
-                          <Plus size={14} />
-                        </button>
-                      </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex items-center rounded-xl border border-line-strong">
+                      <button
+                        onClick={() => updateQty(l.product.id, l.quantity - 1)}
+                        aria-label="Меньше"
+                        className="flex h-10 w-10 items-center justify-center rounded-l-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <input
+                        inputMode="decimal"
+                        value={l.quantity}
+                        onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
+                        aria-label="Количество"
+                        className="h-10 w-11 border-x border-line-strong bg-transparent text-center text-sm tabular-nums text-fg outline-none"
+                      />
+                      <button
+                        onClick={() => updateQty(l.product.id, l.quantity + 1)}
+                        aria-label="Больше"
+                        className="flex h-10 w-10 items-center justify-center rounded-r-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        <Plus size={14} />
+                      </button>
                     </div>
 
-                    <div>
-                      <div className="text-xs text-fg-muted mb-1">Цена продажи, ₸</div>
+                    <div className="relative min-w-28 flex-1">
                       <input
                         inputMode="numeric"
                         value={l.finalPrice}
                         onChange={(e) => updatePrice(l.product.id, parseFloat(e.target.value) || 0)}
-                        className={`w-full h-10 rounded-xl border bg-transparent px-3 text-right outline-none tabular-nums font-semibold ${
+                        aria-label="Цена продажи"
+                        className={`h-10 w-full rounded-xl border bg-transparent pr-7 pl-3 text-right text-sm font-semibold tabular-nums outline-none ${
                           hasDiscount
-                            ? 'border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
+                            ? 'border-amber-300 text-amber-600 dark:border-amber-800 dark:text-amber-400'
                             : 'border-line-strong text-fg'
                         }`}
                       />
+                      <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs text-fg-muted">₸</span>
                     </div>
-                  </div>
 
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="text-fg-muted">
-                        Цена по прайсу <span className={`tabular-nums ${hasDiscount ? 'line-through' : ''}`}>{formatMoney(base)}</span>
-                      </span>
-                      {hasDiscount ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300">
-                          <Tag size={11} />
-                          Скидка −{formatMoney((base - l.finalPrice) * l.quantity)} ({pct.toFixed(pct < 10 ? 1 : 0)}%)
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Без скидки</span>
-                      )}
-                    </div>
-                    <div className="ml-auto font-semibold text-sm tabular-nums text-fg">
+                    <button
+                      onClick={() => setDiscountFor(discountOpen ? null : l.product.id)}
+                      aria-label="Скидка"
+                      title="Скидка"
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                        discountOpen || hasDiscount
+                          ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                          : 'border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg'
+                      }`}
+                    >
+                      <Percent size={15} />
+                    </button>
+
+                    <div className="ml-auto text-right text-base font-semibold tabular-nums text-fg">
                       {formatMoney(l.finalPrice * l.quantity)}
                     </div>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {QUICK_DISCOUNTS.map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => applyDiscount(l.product.id, d)}
-                        className="rounded-lg border border-line-strong px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                      >
-                        −{d}%
-                      </button>
-                    ))}
-                    {hasDiscount && (
+                  {hasDiscount && (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                      <span className="text-fg-muted line-through tabular-nums">{formatMoney(base)}</span>
+                      <span className="font-medium text-amber-600 dark:text-amber-400">
+                        скидка {pct.toFixed(pct < 10 ? 1 : 0)}% · −{formatMoney((base - l.finalPrice) * l.quantity)}
+                      </span>
+                      {overLimit && (
+                        <span className="text-amber-700 dark:text-amber-300">выше лимита {limit}%</span>
+                      )}
                       <button
                         onClick={() => resetPrice(l.product.id)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-fg-muted hover:bg-surface-muted hover:text-fg"
                       >
-                        <RotateCcw size={11} /> Вернуть прайс
+                        <RotateCcw size={11} /> вернуть прайс
                       </button>
-                    )}
-                    {overLimit && (
-                      <span className="text-xs text-amber-700 dark:text-amber-300">
-                        выше лимита {limit}%
-                      </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {discountOpen && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line pt-2">
+                      <span className="mr-1 text-xs text-fg-muted">Скидка:</span>
+                      {QUICK_DISCOUNTS.map((d) => (
+                        <button
+                          key={d}
+                          onClick={() => {
+                            applyDiscount(l.product.id, d)
+                            setDiscountFor(null)
+                          }}
+                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
+                        >
+                          −{d}%
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => {
+                          resetPrice(l.product.id)
+                          setDiscountFor(null)
+                        }}
+                        className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        без скидки
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -339,20 +359,26 @@ export default function SalePage() {
 
       {/* Панель оплаты: справа на компьютере, внизу страницы на телефоне */}
       <div className="rounded-2xl border border-line bg-surface p-4 h-fit lg:sticky lg:top-4 space-y-4">
-        <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between text-fg-muted">
-            <span>Сумма по прайсу</span>
-            <span className="tabular-nums">{formatMoney(subtotal)}</span>
-          </div>
+        {/* Без скидки строки «по прайсу» и «скидка» показывали бы то же самое
+            число трижды — поэтому они появляются только когда есть торг. */}
+        <div className="text-sm">
           {discountTotal > 0 && (
-            <div className="flex justify-between text-amber-600 dark:text-amber-400">
-              <span>Скидка {discountPct >= 0.5 && `(${discountPct.toFixed(discountPct < 10 ? 1 : 0)}%)`}</span>
-              <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
+            <div className="mb-2 space-y-1.5">
+              <div className="flex justify-between text-fg-muted">
+                <span>По прайсу</span>
+                <span className="tabular-nums">{formatMoney(subtotal)}</span>
+              </div>
+              <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                <span>Скидка {discountPct >= 0.5 && `${discountPct.toFixed(discountPct < 10 ? 1 : 0)}%`}</span>
+                <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
+              </div>
             </div>
           )}
-          <div className="flex justify-between text-lg font-semibold text-fg pt-1 border-t border-line">
-            <span>Итого</span>
-            <span className="tabular-nums">{formatMoney(total)}</span>
+          <div className="flex items-baseline justify-between">
+            <span className="text-fg-muted">Итого</span>
+            <span className="text-2xl font-semibold tracking-tight tabular-nums text-fg">
+              {formatMoney(total)}
+            </span>
           </div>
         </div>
 
