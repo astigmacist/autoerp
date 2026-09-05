@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/store/auth'
+import { Logo, LogoMark } from '@/components/Logo'
 import { useTheme } from '@/store/theme'
 
 interface NavItem {
@@ -32,6 +33,21 @@ const ROLE_LABELS: Record<string, string> = {
   owner: 'Владелец',
   stock: 'Менеджер склада',
   seller: 'Продавец',
+}
+
+/** Инициалы вместо пустого места — интерфейс становится «своим». */
+function Avatar({ name }: { name?: string }) {
+  const initials = (name ?? '')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('')
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-xs font-semibold text-fg-muted">
+      {initials || '—'}
+    </span>
+  )
 }
 
 function ThemeToggle({ withLabel = false }: { withLabel?: boolean }) {
@@ -78,11 +94,11 @@ export default function Layout() {
   const current = items.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)))
 
   return (
-    <div className="min-h-screen flex bg-[#f6f7f9] dark:bg-[#0f1115]">
+    <div className="min-h-screen flex bg-canvas">
       {/* Боковая панель — только на большом экране */}
-      <aside className="hidden md:flex w-60 flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] shrink-0">
-        <div className="h-16 flex items-center px-5 font-semibold text-lg text-gray-900 dark:text-gray-100">
-          AutoZap <span className="text-gray-400 font-normal ml-1 text-sm">ERP</span>
+      <aside className="hidden md:flex w-60 flex-col border-r border-line bg-surface shrink-0">
+        <div className="flex h-16 items-center px-4">
+          <Logo />
         </div>
         <nav className="flex-1 px-3 space-y-1">
           {items.map((item) => (
@@ -93,8 +109,8 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'bg-gray-900 text-white shadow-card dark:bg-gray-100 dark:text-gray-900'
+                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg'
                 }`
               }
             >
@@ -103,10 +119,13 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="p-3 border-t border-gray-100 dark:border-gray-800">
-          <div className="px-3 py-2 text-sm">
-            <div className="font-medium text-gray-900 dark:text-gray-100">{user?.full_name}</div>
-            <div className="text-gray-400 text-xs">{ROLE_LABELS[user?.role ?? ''] ?? ''}</div>
+        <div className="p-3 border-t border-line">
+          <div className="mb-1 flex items-center gap-2.5 px-2 py-2">
+            <Avatar name={user?.full_name} />
+            <div className="min-w-0 text-sm">
+              <div className="truncate font-medium text-fg">{user?.full_name}</div>
+              <div className="text-xs text-fg-muted">{ROLE_LABELS[user?.role ?? ''] ?? ''}</div>
+            </div>
           </div>
           <ThemeToggle withLabel />
           <button
@@ -119,8 +138,11 @@ export default function Layout() {
       </aside>
 
       {/* Верхняя полоса — только на телефоне */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-white dark:bg-[#151720] border-b border-gray-200 dark:border-gray-800 flex items-center justify-between pl-4 pr-2">
-        <div className="font-semibold text-gray-900 dark:text-gray-100">{current?.label ?? 'AutoZap'}</div>
+      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface/90 backdrop-blur border-b border-line flex items-center justify-between pl-4 pr-2">
+        <div className="flex items-center gap-2.5">
+          <LogoMark size={28} />
+          <span className="font-semibold text-fg">{current?.label ?? 'AutoZap'}</span>
+        </div>
         <ThemeToggle />
       </header>
 
@@ -132,7 +154,7 @@ export default function Layout() {
 
       {/* Нижняя панель — основной способ навигации на телефоне: до неё легко
           дотянуться большим пальцем, в отличие от бокового меню за «гамбургером». */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white dark:bg-[#151720] border-t border-gray-200 dark:border-gray-800 pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
         <div className="flex">
           {primary.map((item) => (
             <NavLink
@@ -141,7 +163,7 @@ export default function Layout() {
               end={item.end}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
-                  isActive ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'
+                  isActive ? 'text-fg' : 'text-gray-400 dark:text-gray-500'
                 }`
               }
             >
@@ -173,11 +195,14 @@ export default function Layout() {
       {moreOpen && (
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMoreOpen(false)} />
-          <div className="absolute bottom-0 inset-x-0 rounded-t-2xl bg-white dark:bg-[#151720] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto">
+          <div className="absolute bottom-0 inset-x-0 rounded-t-2xl bg-surface-2 shadow-pop animate-[slideUp_.18s_ease-out] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between px-2 py-2 mb-1">
-              <div>
-                <div className="font-semibold text-gray-900 dark:text-gray-100">{user?.full_name}</div>
-                <div className="text-xs text-gray-400">{ROLE_LABELS[user?.role ?? ''] ?? ''}</div>
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Avatar name={user?.full_name} />
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-fg">{user?.full_name}</div>
+                  <div className="text-xs text-fg-muted">{ROLE_LABELS[user?.role ?? ''] ?? ''}</div>
+                </div>
               </div>
               <button
                 onClick={() => setMoreOpen(false)}
@@ -210,7 +235,7 @@ export default function Layout() {
               </nav>
             )}
 
-            <div className="border-t border-gray-100 dark:border-gray-800 pt-2 space-y-1">
+            <div className="border-t border-line pt-2 space-y-1">
               <ThemeToggle withLabel />
               <button
                 onClick={handleLogout}

@@ -3,6 +3,7 @@ import { Search, Loader2, PackagePlus } from 'lucide-react'
 import { useProductSearch } from '@/api/queries'
 import { formatMoney, formatQty } from '@/lib/format'
 import type { ProductSearchResult } from '@/api/types'
+import { fieldClass } from '@/components/ui'
 
 interface Props {
   onSelect: (p: ProductSearchResult) => void
@@ -23,12 +24,12 @@ export default function ProductPicker({ onSelect, placeholder, onCreateNew }: Pr
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder ?? 'Найти товар по названию, коду, OEM…'}
-          className="w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100"
+          className={`${fieldClass} h-11 md:h-10 pl-9`}
         />
         {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={14} />}
       </div>
       {query.trim().length >= 2 && (
-        <div className="absolute z-20 mt-1 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] shadow-lg divide-y divide-gray-100 dark:divide-gray-800 max-h-64 overflow-y-auto">
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-line bg-surface shadow-lg divide-y divide-line max-h-64 overflow-y-auto">
           {!isFetching && results?.length === 0 && (
             <div className="p-3">
               <div className="text-sm text-gray-400 mb-2">Ничего не найдено</div>
@@ -58,7 +59,7 @@ export default function ProductPicker({ onSelect, placeholder, onCreateNew }: Pr
               className="w-full text-left px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-2"
             >
               <div className="min-w-0">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.name}</div>
+                <div className="text-sm font-medium text-fg truncate">{p.name}</div>
                 <div className="text-xs text-gray-400">{p.sku}</div>
               </div>
               <div className="text-right shrink-0 text-xs text-gray-400">

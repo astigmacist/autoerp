@@ -2,7 +2,7 @@ import type { StockStatus } from '@/api/types'
 import { formatQty } from '@/lib/format'
 
 const config: Record<StockStatus, { label: string; cls: string }> = {
-  out: { label: 'Нет в наличии', cls: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700' },
+  out: { label: 'Нет в наличии', cls: 'bg-gray-100 dark:bg-gray-800 text-fg-muted border-line-strong' },
   low: { label: 'Дефицит', cls: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900' },
   warning: { label: 'Заканчивается', cls: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900' },
   ok: { label: 'В наличии', cls: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900' },

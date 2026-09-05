@@ -3,30 +3,36 @@ import { useToast } from '@/store/toast'
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react'
 
 const styles: Record<string, string> = {
-  success: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-900 text-emerald-800 dark:text-emerald-200',
-  error: 'bg-red-50 dark:bg-red-950/60 border-red-200 dark:border-red-900 text-red-800 dark:text-red-200',
-  info: 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200',
+  success: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-100',
+  error: 'border-red-200 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/80 dark:text-red-100',
+  info: 'border-line bg-surface-2 text-fg',
 }
 
 const icons: Record<string, ReactNode> = {
-  success: <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />,
-  error: <XCircle size={18} className="text-red-600 dark:text-red-400 shrink-0" />,
-  info: <Info size={18} className="text-gray-500 dark:text-gray-400 shrink-0" />,
+  success: <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />,
+  error: <XCircle size={18} className="shrink-0 text-red-600 dark:text-red-400" />,
+  info: <Info size={18} className="shrink-0 text-brand-500" />,
 }
 
 export default function Toaster() {
   const { toasts, remove } = useToast()
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-full max-w-sm">
+    // На телефоне уведомления показываются сверху во всю ширину, на компьютере —
+    // в правом верхнем углу. Раньше на узком экране они наезжали на содержимое.
+    <div className="pointer-events-none fixed inset-x-3 top-3 z-[100] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-4 sm:w-full sm:max-w-sm">
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-start gap-2 rounded-xl border px-4 py-3 shadow-sm text-sm ${styles[t.variant]}`}
+          className={`pointer-events-auto flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-pop animate-[toastIn_.18s_ease-out] ${styles[t.variant]}`}
         >
           {icons[t.variant]}
-          <div className="flex-1">{t.message}</div>
-          <button onClick={() => remove(t.id)} className="opacity-50 hover:opacity-100">
-            <X size={16} />
+          <div className="flex-1 leading-snug">{t.message}</div>
+          <button
+            onClick={() => remove(t.id)}
+            aria-label="Закрыть"
+            className="-mr-1 shrink-0 rounded-lg p-0.5 opacity-50 hover:opacity-100"
+          >
+            <X size={15} />
           </button>
         </div>
       ))}

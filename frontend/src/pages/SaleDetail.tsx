@@ -8,6 +8,7 @@ import { useToast } from '@/store/toast'
 import { formatDateTime, formatMoney, formatQty } from '@/lib/format'
 import Modal from '@/components/Modal'
 import type { Payment, PaymentMethod, Sale } from '@/api/types'
+import { fieldClass } from '@/components/ui'
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = { cash: 'Наличные', kaspi_qr: 'Kaspi QR', card: 'Карта', transfer: 'Перевод' }
 const STATUS_LABELS: Record<string, string> = {
@@ -78,24 +79,24 @@ export default function SaleDetail() {
         <ArrowLeft size={16} /> К журналу продаж
       </button>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-5">
+      <div className="rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{sale.number}</h1>
+            <h1 className="text-lg font-semibold text-fg">{sale.number}</h1>
             <div className="text-sm text-gray-400">{formatDateTime(sale.created_at)} · {sale.seller_name}</div>
           </div>
-          <span className={`text-xs rounded-full px-2.5 py-1 ${sale.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}>
+          <span className={`text-xs rounded-full px-2.5 py-1 ${sale.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-fg-muted'}`}>
             {STATUS_LABELS[sale.status] ?? sale.status}
           </span>
         </div>
 
-        <div className="mt-4 divide-y divide-gray-100 dark:divide-gray-800">
+        <div className="mt-4 divide-y divide-line">
           {sale.items.map((i) => {
             const rem = remaining(String(i.quantity), String(i.returned_qty))
             return (
               <div key={i.id} className="py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{i.product_name}</div>
+                  <div className="text-sm font-medium text-fg">{i.product_name}</div>
                   <div className="text-xs text-gray-400">
                     {i.sku} · {formatQty(i.quantity)} × {formatMoney(i.final_price)}
                     {parseFloat(i.returned_qty) > 0 && ` · возвращено ${formatQty(i.returned_qty)}`}
@@ -114,7 +115,7 @@ export default function SaleDetail() {
                         const v = Math.max(0, Math.min(rem, parseFloat(e.target.value) || 0))
                         setReturnQty((prev) => ({ ...prev, [i.id]: v }))
                       }}
-                      className="w-16 text-right rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-sm tabular-nums outline-none"
+                      className="w-16 text-right rounded-lg border border-line-strong bg-transparent px-2 py-1 text-sm tabular-nums outline-none"
                     />
                   )}
                 </div>
@@ -123,7 +124,7 @@ export default function SaleDetail() {
           })}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 space-y-1.5 text-sm">
+        <div className="mt-4 pt-4 border-t border-line space-y-1.5 text-sm">
           <div className="flex justify-between text-gray-500">
             <span>Сумма по прайсу</span>
             <span className="tabular-nums">{formatMoney(sale.subtotal)}</span>
@@ -134,7 +135,7 @@ export default function SaleDetail() {
               <span className="tabular-nums">−{formatMoney(sale.discount_total)}</span>
             </div>
           )}
-          <div className="flex justify-between text-base font-semibold text-gray-900 dark:text-gray-100">
+          <div className="flex justify-between text-base font-semibold text-fg">
             <span>Итого</span>
             <span className="tabular-nums">{formatMoney(sale.total)}</span>
           </div>
@@ -151,19 +152,19 @@ export default function SaleDetail() {
       </div>
 
       {canReturn && selectedLines.length > 0 && (
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-5 space-y-3">
+        <div className="rounded-2xl border border-line bg-surface p-5 space-y-3">
           <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Оформить возврат</div>
           <div>
-            <label className="text-xs text-gray-500">Причина</label>
-            <input value={reason} onChange={(e) => setReason(e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" placeholder="Брак, не подошло…" />
+            <label className="text-xs font-medium text-fg-muted">Причина</label>
+            <input value={reason} onChange={(e) => setReason(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="Брак, не подошло…" />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Способ возврата денег</label>
-            <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as PaymentMethod)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none">
+            <label className="text-xs font-medium text-fg-muted">Способ возврата денег</label>
+            <select value={refundMethod} onChange={(e) => setRefundMethod(e.target.value as PaymentMethod)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
               {Object.entries(PAYMENT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
-          <button onClick={() => setConfirmOpen(true)} className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-600 text-white py-2.5 text-sm font-semibold">
+          <button onClick={() => setConfirmOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition-transform hover:bg-red-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 w-full">
             <RotateCcw size={15} /> Вернуть на {formatMoney(returnTotal)}
           </button>
         </div>
@@ -175,8 +176,8 @@ export default function SaleDetail() {
         title="Подтвердите возврат"
         footer={
           <>
-            <button onClick={() => setConfirmOpen(false)} disabled={submitting} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">Отмена</button>
-            <button onClick={submitReturn} disabled={submitting} className="px-4 py-2 rounded-xl text-sm font-semibold bg-red-600 text-white flex items-center gap-2 disabled:opacity-60">
+            <button onClick={() => setConfirmOpen(false)} disabled={submitting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">Отмена</button>
+            <button onClick={submitReturn} disabled={submitting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white transition-transform hover:bg-red-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">
               {submitting && <Loader2 className="animate-spin" size={14} />} Подтвердить возврат
             </button>
           </>
@@ -189,7 +190,7 @@ export default function SaleDetail() {
               <span className="font-medium tabular-nums">{formatMoney(l.qty * parseFloat(l.item.final_price))}</span>
             </div>
           ))}
-          <div className="flex justify-between text-base font-semibold text-gray-900 dark:text-gray-100 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between text-base font-semibold text-fg pt-2 border-t border-line">
             <span>К возврату</span>
             <span className="tabular-nums">{formatMoney(returnTotal)}</span>
           </div>

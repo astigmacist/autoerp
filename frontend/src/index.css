@@ -1,33 +1,83 @@
 @import "tailwindcss";
 
 /* Тема переключается вручную (кнопка в интерфейсе), а не системной настройкой:
-   в магазине за одним компьютером работают разные люди, и «как в системе»
-   их не устраивает. Эта строка переводит все утилиты dark:* с медиазапроса
-   prefers-color-scheme на класс .dark у <html>, которым управляет store/theme.ts. */
+   в магазине за одним компьютером работают разные люди. Эта строка переводит
+   все утилиты dark:* с медиазапроса prefers-color-scheme на класс .dark
+   у <html>, которым управляет store/theme.ts. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* color-scheme управляет видом системных элементов — календарей у полей с
-   датой, выпадающих списков, полос прокрутки. Раз тема теперь выбирается
-   вручную, он должен следовать выбору, а не системе. */
+/* ── Токены дизайна ────────────────────────────────────────────────────────
+   Раньше каждый экран собирал цвета вручную (`bg-white dark:bg-[#151720]`
+   в сорока местах), и оттенки понемногу разъезжались. Теперь поверхности,
+   линии и акцент заданы один раз и переключаются вместе с темой. */
+
 :root {
-  color-scheme: light;
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* Recharts <Tooltip> renders its own popup outside of any component we
-     control, styled via inline `contentStyle`/`labelStyle`/`itemStyle`
-     props — it doesn't pick up Tailwind's dark: utilities at all, so
-     without this it always shows a plain white box (readable, but visually
-     stuck in light mode). These variables let the chart tooltips follow
-     the same OS-driven dark mode as the rest of the app. */
+  /* Светлая тема */
+  --canvas: #f5f6f8;        /* фон страницы */
+  --surface: #ffffff;       /* карточки, панели */
+  --surface-2: #ffffff;     /* модальные окна, всплывающие списки */
+  --surface-muted: #f8f9fb; /* шапки таблиц, подложки */
+  --line: #e7e9ee;          /* обычные разделители и рамки */
+  --line-strong: #d6dae1;   /* рамки полей ввода */
+  --fg: #16171d;
+  --fg-muted: #6b7280;
+
   --chart-tooltip-bg: #ffffff;
   --chart-tooltip-fg: #16171d;
-  --chart-tooltip-border: #e5e7eb;
+  --chart-tooltip-border: #e7e9ee;
+
+  color-scheme: light;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 .dark {
+  /* Тёмная тема: чуть теплее и контрастнее прежнего — карточки заметно
+     отделяются от фона, а рамки перестали сливаться. */
+  --canvas: #0b0d12;
+  --surface: #14161c;
+  --surface-2: #1a1d25;
+  --surface-muted: #191c23;
+  --line: #262a33;
+  --line-strong: #333845;
+  --fg: #e8eaee;
+  --fg-muted: #9aa1ad;
+
+  --chart-tooltip-bg: #1a1d25;
+  --chart-tooltip-fg: #e8eaee;
+  --chart-tooltip-border: #333845;
+
   color-scheme: dark;
-  --chart-tooltip-bg: #1b1d24;
-  --chart-tooltip-fg: #e5e7eb;
-  --chart-tooltip-border: #33353f;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+}
+
+@theme {
+  /* Акцент. Используется для фокуса, ссылок, выделенных состояний и графиков —
+     то есть там, где интерфейс отвечает на действие. Основные кнопки остаются
+     почти чёрными: так акцент не превращается в фон и не теряет силу. */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  --shadow-card: 0 1px 2px rgb(16 17 29 / 0.04), 0 1px 3px rgb(16 17 29 / 0.03);
+  --shadow-raised: 0 4px 12px rgb(16 17 29 / 0.06), 0 1px 3px rgb(16 17 29 / 0.04);
+  --shadow-pop: 0 12px 32px rgb(16 17 29 / 0.12), 0 2px 8px rgb(16 17 29 / 0.06);
 }
 
 * {
@@ -42,20 +92,107 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
-  background: #f6f7f9;
-  color: #16171d;
+  background: var(--canvas);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* Базовые цвета страницы. Важно: у полей ввода и <select> нет собственного
- * класса с цветом текста — они наследуют цвет от body (Tailwind сбрасывает
- * им color на inherit). Пока эти правила висели на классе, который никто не
- * ставил, в тёмной теме получался почти чёрный текст на почти чёрном фоне —
- * то есть невидимый ввод во всех формах, включая вход. */
-.dark body {
-  background: #0f1115;
-  color: #e5e7eb;
+/* Поля ввода и <select> не имеют своего класса с цветом текста — они
+   наследуют его отсюда (Tailwind сбрасывает им color на inherit). Когда эти
+   правила висели на классе, который никто не ставил, в тёмной теме выходил
+   почти чёрный текст на почти чёрном фоне: невидимый ввод во всех формах. */
+
+/* Единое кольцо фокуса. До этого его имели 4 поля из 44 — остальные никак не
+   отзывались на клавиатуру и клик, из-за чего интерфейс казался неживым.
+   :focus-visible показывает кольцо при работе с клавиатуры и не мешает мыши. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
 }
 
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 8px; }
-.dark ::-webkit-scrollbar-thumb { background: #3f414b; }
+::selection {
+  background: var(--color-brand-500);
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Плавные, но короткие переходы — интерфейс отзывается, но не «плывёт». */
+@media (prefers-reduced-motion: no-preference) {
+  a, button, input, select, textarea, [role='button'] {
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease,
+                box-shadow .15s ease, opacity .15s ease;
+  }
+}
+
+/* Появление нижней шторки. Резко возникающая панель читается как сбой
+   отрисовки; короткое движение снизу объясняет, откуда она взялась. */
+@keyframes slideUp {
+  from { transform: translateY(8%); opacity: .6; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes popIn {
+  from { transform: translateY(6px) scale(.985); opacity: 0 }
+  to   { transform: translateY(0)   scale(1);    opacity: 1 }
+}
+@keyframes toastIn {
+  from { transform: translateY(-6px); opacity: 0 }
+  to   { transform: translateY(0);    opacity: 1 }
+}
+
+/* Выпадающие списки. Системный вид <select> ломал ощущение цельности: рядом
+   с аккуратными полями ввода стоял серый элемент операционной системы со
+   своей стрелкой. Здесь стрелка своя и одинаковая в обеих темах. */
+.select-field {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  background-size: 1.15rem;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+.dark .select-field {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa1ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Поле с датой: системная иконка календаря в тёмной теме почти не видна. */
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(.6);
+}
+
+/* ── Таблицы ───────────────────────────────────────────────────────────────
+   Правила общие: таблиц в приложении девять, и подгонять каждую отдельно
+   означало бы снова развести оформление. */
+
+/* Заголовки колонок: мельче и спокойнее, чтобы не спорить с данными. */
+thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* Суммы и количества не переносятся: «12 000 ₸» разрывалось на две строки
+   и колонка выглядела сломанной. */
+th.tabular-nums, td.tabular-nums { white-space: nowrap; }
+
+/* Подсветка строки под курсором — видно, где находишься в длинном списке. */
+tbody tr { transition: background-color .12s ease; }
+tbody tr:hover { background: var(--surface-muted); }
+
+/* Действия в строке проявляются при наведении на строку, а не мозолят глаза
+   бледными значками в каждой строке. */
+tbody tr .row-actions { opacity: .45; transition: opacity .12s ease; }
+tbody tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }

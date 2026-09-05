@@ -8,6 +8,7 @@ import { formatMoney, formatQty } from '@/lib/format'
 import Modal from '@/components/Modal'
 import ShiftBar from '@/components/ShiftBar'
 import type { PaymentMethod, ProductSearchResult, Sale } from '@/api/types'
+import { fieldClass } from '@/components/ui'
 
 interface CartLine {
   product: ProductSearchResult
@@ -176,13 +177,13 @@ export default function SalePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск по названию, коду, OEM или штрихкоду…"
-            className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] pl-10 pr-4 py-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100"
+            className={`${fieldClass} h-12 rounded-2xl pl-10 text-base sm:text-sm`}
           />
           {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={16} />}
         </div>
 
         {query.trim().length >= 2 && (
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
+          <div className="rounded-2xl border border-line bg-surface divide-y divide-line max-h-80 overflow-y-auto">
             {results?.length === 0 && <div className="p-4 text-sm text-gray-400">Ничего не найдено</div>}
             {results?.map((p) => (
               <button
@@ -191,7 +192,7 @@ export default function SalePage() {
                 className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.name}</div>
+                  <div className="text-sm font-medium text-fg truncate">{p.name}</div>
                   <div className="text-xs text-gray-400">{p.sku} {p.oem_code && `· ${p.oem_code}`}</div>
                 </div>
                 <div className="text-right shrink-0">
@@ -209,7 +210,7 @@ export default function SalePage() {
             количеством и скидкой не помещается, а на компьютере карточка
             позволяет крупно показать и прайс, и цену продажи, и размер скидки. */}
         {cart.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-12 text-center text-sm text-gray-400">
+          <div className="rounded-2xl border border-dashed border-line-strong px-4 py-12 text-center text-sm text-gray-400">
             Корзина пуста. Найдите товар в строке поиска выше.
           </div>
         ) : (
@@ -222,15 +223,15 @@ export default function SalePage() {
               return (
                 <div
                   key={l.product.id}
-                  className={`rounded-2xl border bg-white dark:bg-[#151720] p-3 sm:p-4 ${
+                  className={`rounded-2xl border bg-surface p-3 sm:p-4 ${
                     overLimit
                       ? 'border-amber-300 dark:border-amber-800'
-                      : 'border-gray-200 dark:border-gray-800'
+                      : 'border-line'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-medium text-gray-900 dark:text-gray-100">{l.product.name}</div>
+                      <div className="font-medium text-fg">{l.product.name}</div>
                       <div className="text-xs text-gray-400">{l.product.sku}</div>
                     </div>
                     <button
@@ -246,12 +247,12 @@ export default function SalePage() {
                       экране растягивать их на пол-карточки незачем. */}
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-[11rem_13rem] gap-3">
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Количество</div>
+                      <div className="text-xs text-fg-muted mb-1">Количество</div>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => updateQty(l.product.id, l.quantity - 1)}
                           aria-label="Меньше"
-                          className="h-10 w-10 shrink-0 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-line-strong flex items-center justify-center text-gray-600 dark:text-gray-300"
                         >
                           <Minus size={14} />
                         </button>
@@ -259,12 +260,12 @@ export default function SalePage() {
                           inputMode="decimal"
                           value={l.quantity}
                           onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
-                          className="w-full min-w-0 h-10 text-center rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent outline-none tabular-nums text-gray-900 dark:text-gray-100"
+                          className="w-full min-w-0 h-10 text-center rounded-xl border border-line-strong bg-transparent outline-none tabular-nums text-fg"
                         />
                         <button
                           onClick={() => updateQty(l.product.id, l.quantity + 1)}
                           aria-label="Больше"
-                          className="h-10 w-10 shrink-0 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-line-strong flex items-center justify-center text-gray-600 dark:text-gray-300"
                         >
                           <Plus size={14} />
                         </button>
@@ -272,7 +273,7 @@ export default function SalePage() {
                     </div>
 
                     <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Цена продажи, ₸</div>
+                      <div className="text-xs text-fg-muted mb-1">Цена продажи, ₸</div>
                       <input
                         inputMode="numeric"
                         value={l.finalPrice}
@@ -280,7 +281,7 @@ export default function SalePage() {
                         className={`w-full h-10 rounded-xl border bg-transparent px-3 text-right outline-none tabular-nums font-semibold ${
                           hasDiscount
                             ? 'border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
-                            : 'border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100'
+                            : 'border-line-strong text-fg'
                         }`}
                       />
                     </div>
@@ -288,7 +289,7 @@ export default function SalePage() {
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="text-gray-500 dark:text-gray-400">
+                      <span className="text-fg-muted">
                         Цена по прайсу <span className={`tabular-nums ${hasDiscount ? 'line-through' : ''}`}>{formatMoney(base)}</span>
                       </span>
                       {hasDiscount ? (
@@ -300,7 +301,7 @@ export default function SalePage() {
                         <span className="text-gray-400">Без скидки</span>
                       )}
                     </div>
-                    <div className="ml-auto font-semibold text-sm tabular-nums text-gray-900 dark:text-gray-100">
+                    <div className="ml-auto font-semibold text-sm tabular-nums text-fg">
                       {formatMoney(l.finalPrice * l.quantity)}
                     </div>
                   </div>
@@ -310,7 +311,7 @@ export default function SalePage() {
                       <button
                         key={d}
                         onClick={() => applyDiscount(l.product.id, d)}
-                        className="rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        className="rounded-lg border border-line-strong px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
                         −{d}%
                       </button>
@@ -337,9 +338,9 @@ export default function SalePage() {
       </div>
 
       {/* Панель оплаты: справа на компьютере, внизу страницы на телефоне */}
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-4 h-fit lg:sticky lg:top-4 space-y-4">
+      <div className="rounded-2xl border border-line bg-surface p-4 h-fit lg:sticky lg:top-4 space-y-4">
         <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-500 dark:text-gray-400">
+          <div className="flex justify-between text-fg-muted">
             <span>Сумма по прайсу</span>
             <span className="tabular-nums">{formatMoney(subtotal)}</span>
           </div>
@@ -349,7 +350,7 @@ export default function SalePage() {
               <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
             </div>
           )}
-          <div className="flex justify-between text-lg font-semibold text-gray-900 dark:text-gray-100 pt-1 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex justify-between text-lg font-semibold text-fg pt-1 border-t border-line">
             <span>Итого</span>
             <span className="tabular-nums">{formatMoney(total)}</span>
           </div>
@@ -385,7 +386,7 @@ export default function SalePage() {
                   className={`rounded-xl border px-2 py-3 text-sm font-medium transition-colors ${
                     payMethod === opt.value
                       ? 'border-gray-900 dark:border-gray-100 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                      : 'border-line-strong text-gray-600 dark:text-gray-300'
                   }`}
                 >
                   {opt.label}
@@ -404,7 +405,7 @@ export default function SalePage() {
                     onChange={(e) =>
                       setSplitAmounts((prev) => ({ ...prev, [opt.value]: parseFloat(e.target.value) || 0 }))
                     }
-                    className="flex-1 h-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-sm text-right tabular-nums outline-none text-gray-900 dark:text-gray-100"
+                    className={`flex-1 ${fieldClass} h-10 text-right tabular-nums`}
                     placeholder="0"
                   />
                 </div>
@@ -418,13 +419,13 @@ export default function SalePage() {
 
         {!splitMode && payMethod === 'cash' && (
           <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">Получено наличными</label>
+            <label className="text-xs text-fg-muted">Получено наличными</label>
             <input
               type="number"
               inputMode="numeric"
               value={customerReceived}
               onChange={(e) => setCustomerReceived(e.target.value)}
-              className="w-full mt-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 text-sm tabular-nums outline-none text-gray-900 dark:text-gray-100"
+              className={`mt-1 ${fieldClass} h-11 text-right tabular-nums`}
               placeholder={String(total)}
             />
             {change !== null && customerReceived && (
@@ -433,10 +434,12 @@ export default function SalePage() {
           </div>
         )}
 
+        {/* На телефоне ту же кнопку показывает закреплённая внизу полоса итога,
+            и две одинаковые кнопки подряд только путали. */}
         <button
           disabled={!canConfirm}
           onClick={() => setConfirmOpen(true)}
-          className="w-full rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 py-3 text-sm font-semibold disabled:opacity-40"
+          className="hidden h-12 w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 lg:inline-flex dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
         >
           Оформить продажу
         </button>
@@ -445,20 +448,20 @@ export default function SalePage() {
       {/* Итог и кнопка всегда под рукой на телефоне: корзина длинная, а
           прокручивать вниз к панели оплаты ради каждой продажи неудобно. */}
       {cart.length > 0 && (
-        <div className="lg:hidden fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-[#151720]/95 backdrop-blur px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+        <div className="lg:hidden fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-surface/95 backdrop-blur px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
           <div className="flex items-center gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] text-gray-500 dark:text-gray-400">
+              <div className="text-[11px] text-fg-muted">
                 Итого{discountTotal > 0 && ` · скидка ${formatMoney(discountTotal)}`}
               </div>
-              <div className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100 leading-tight">
+              <div className="text-lg font-semibold tabular-nums text-fg leading-tight">
                 {formatMoney(total)}
               </div>
             </div>
             <button
               disabled={!canConfirm}
               onClick={() => setConfirmOpen(true)}
-              className="ml-auto shrink-0 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-5 py-3 text-sm font-semibold disabled:opacity-40"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white ml-auto h-12 shrink-0 px-5"
             >
               Оформить
             </button>
@@ -479,14 +482,14 @@ export default function SalePage() {
             <button
               onClick={() => setConfirmOpen(false)}
               disabled={submitting}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
             >
               Отмена
             </button>
             <button
               onClick={submitSale}
               disabled={submitting}
-              className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-60"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
               {submitting && <Loader2 className="animate-spin" size={14} />}
               Подтвердить
@@ -512,8 +515,8 @@ export default function SalePage() {
               </div>
             )
           })}
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-2 space-y-1">
-            <div className="flex justify-between text-gray-500 dark:text-gray-400">
+          <div className="border-t border-line pt-2 space-y-1">
+            <div className="flex justify-between text-fg-muted">
               <span>Сумма по прайсу</span>
               <span className="tabular-nums">{formatMoney(subtotal)}</span>
             </div>
@@ -523,11 +526,11 @@ export default function SalePage() {
                 <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
               </div>
             )}
-            <div className="flex justify-between text-base font-semibold text-gray-900 dark:text-gray-100">
+            <div className="flex justify-between text-base font-semibold text-fg">
               <span>Итого к оплате</span>
               <span className="tabular-nums">{formatMoney(total)}</span>
             </div>
-            <div className="text-gray-500 dark:text-gray-400 pt-1">
+            <div className="text-fg-muted pt-1">
               Оплата: {splitMode ? 'смешанная' : PAYMENT_OPTIONS.find((o) => o.value === payMethod)?.label}
             </div>
           </div>

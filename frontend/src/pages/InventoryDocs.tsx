@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Loader2, CheckCircle2 } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useInventories, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
@@ -9,6 +9,7 @@ import Modal from '@/components/Modal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { InventoryDoc, ProductSearchResult, Warehouse } from '@/api/types'
+import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
 
 interface DraftLine {
   productId: string
@@ -19,7 +20,7 @@ interface DraftLine {
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведена' }
 const STATUS_CLS: Record<string, string> = {
-  draft: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
+  draft: 'bg-gray-100 dark:bg-gray-800 text-fg-muted',
   posted: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300',
 }
 
@@ -107,21 +108,21 @@ export default function InventoryDocs() {
     <div className="space-y-4">
       <WarehouseTabs />
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Инвентаризация</h1>
-        <button onClick={openCreate} className="flex items-center gap-1.5 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-3.5 py-2 text-sm font-medium">
+        <h1 className="text-xl font-semibold text-fg">Инвентаризация</h1>
+        <button onClick={openCreate} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
           <Plus size={16} /> Новая инвентаризация
         </button>
       </div>
 
       {/* На телефоне — карточки: в таблицу из шести колонок экран не помещается. */}
       <div className="md:hidden space-y-2">
-        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
-        {docs?.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Инвентаризаций ещё не было</div>}
+        {isLoading && <SkeletonList rows={3} />}
+        {docs?.length === 0 && <Card padded={false}><EmptyState icon={<ClipboardList size={20} />} title="Инвентаризаций ещё не было" /></Card>}
         {docs?.map((d) => (
-          <div key={d.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3">
+          <div key={d.id} className="rounded-2xl border border-line bg-surface p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="font-medium text-gray-900 dark:text-gray-100">{d.number}</div>
+                <div className="font-medium text-fg">{d.number}</div>
                 <div className="text-xs text-gray-400">{formatDate(d.date)} · {d.warehouse_name} · позиций: {d.items.length}</div>
               </div>
               <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span>
@@ -129,7 +130,7 @@ export default function InventoryDocs() {
             {d.status === 'draft' && (
               <button
                 onClick={() => setConfirmDoc(d)}
-                className="mt-2 w-full rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 py-2.5 text-sm font-semibold"
+                className="mt-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 h-11 w-full text-sm"
               >
                 Провести
               </button>
@@ -138,9 +139,9 @@ export default function InventoryDocs() {
         ))}
       </div>
 
-      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
+      <div className="hidden md:block rounded-2xl border border-line bg-surface overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
+          <thead className="bg-surface-muted text-fg-muted">
             <tr>
               <th className="text-left font-medium px-4 py-2.5">№</th>
               <th className="text-left font-medium px-2 py-2.5">Дата</th>
@@ -150,19 +151,19 @@ export default function InventoryDocs() {
               <th className="text-right font-medium px-4 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {isLoading && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Загрузка…</td></tr>}
-            {docs?.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Инвентаризаций ещё не было</td></tr>}
+          <tbody className="divide-y divide-line">
+            {isLoading && <SkeletonRows rows={4} cols={6} />}
+            {docs?.length === 0 && <tr><td colSpan={6} className="px-4 py-4"><EmptyState icon={<ClipboardList size={20} />} title="Инвентаризаций ещё не было" /></td></tr>}
             {docs?.map((d) => (
               <tr key={d.id}>
-                <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-gray-100">{d.number}</td>
+                <td className="px-4 py-2.5 font-medium text-fg">{d.number}</td>
                 <td className="px-2 py-2.5 text-gray-500">{formatDate(d.date)}</td>
                 <td className="px-2 py-2.5 text-gray-500">{d.warehouse_name}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{d.items.length}</td>
                 <td className="px-2 py-2.5"><span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span></td>
                 <td className="px-4 py-2.5 text-right">
                   {d.status === 'draft' && (
-                    <button onClick={() => setConfirmDoc(d)} className="text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 rounded-lg px-2.5 py-1.5">Провести</button>
+                    <button onClick={() => setConfirmDoc(d)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50">Провести</button>
                   )}
                 </td>
               </tr>
@@ -174,8 +175,8 @@ export default function InventoryDocs() {
       <Modal open={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Новая инвентаризация" width="max-w-2xl"
         footer={
           <>
-            <button onClick={() => setCreateOpen(false)} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">Отмена</button>
-            <button onClick={saveDraft} disabled={saving || lines.length === 0} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-40">
+            <button onClick={() => setCreateOpen(false)} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">Отмена</button>
+            <button onClick={saveDraft} disabled={saving || lines.length === 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
               {saving && <Loader2 className="animate-spin" size={14} />} Сохранить черновик
             </button>
           </>
@@ -184,12 +185,12 @@ export default function InventoryDocs() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500">Дата</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
+              <label className="text-xs font-medium text-fg-muted">Дата</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Склад</label>
-              <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLines([]) }} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none">
+              <label className="text-xs font-medium text-fg-muted">Склад</label>
+              <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLines([]) }} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
                 {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </div>
@@ -200,9 +201,9 @@ export default function InventoryDocs() {
           </div>
 
           {lines.length > 0 && (
-            <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="rounded-xl border border-line overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
+                <thead className="bg-surface-muted text-fg-muted">
                   <tr>
                     <th className="text-left font-medium px-3 py-2">Товар</th>
                     <th className="text-right font-medium px-2 py-2 w-24">По системе</th>
@@ -211,7 +212,7 @@ export default function InventoryDocs() {
                     <th className="w-8" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tbody className="divide-y divide-line">
                   {lines.map((l) => {
                     const diff = l.qtyFact - l.qtySystem
                     return (
@@ -240,8 +241,8 @@ export default function InventoryDocs() {
       <Modal open={!!confirmDoc} onClose={() => !posting && setConfirmDoc(null)} title="Провести инвентаризацию?"
         footer={
           <>
-            <button onClick={() => setConfirmDoc(null)} disabled={posting} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">Отмена</button>
-            <button onClick={confirmPost} disabled={posting} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-60">
+            <button onClick={() => setConfirmDoc(null)} disabled={posting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">Отмена</button>
+            <button onClick={confirmPost} disabled={posting} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
               {posting ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />} Провести
             </button>
           </>

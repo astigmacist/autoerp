@@ -71,11 +71,17 @@ export default function ShiftBar() {
           ) : (
             <Lock size={16} className="text-amber-600 shrink-0" />
           )}
+          {/* На телефоне подробности переносились на четыре строки и раздували
+              полосу — там оставляем только суть, детали видны на большом экране. */}
           {shift ? (
-            <span className="text-emerald-800 dark:text-emerald-300">
-              Смена открыта с {formatDateTime(shift.opened_at)}
-              {shift.opened_by_name && ` · ${shift.opened_by_name}`}
-              <span className="text-emerald-600/70 dark:text-emerald-400/70"> · нач. касса {formatMoney(shift.cash_start)}</span>
+            <span className="min-w-0 text-emerald-800 dark:text-emerald-300">
+              <span className="font-medium">Смена открыта</span>
+              <span className="hidden sm:inline"> с {formatDateTime(shift.opened_at)}</span>
+              <span className="sm:hidden"> · {formatDateTime(shift.opened_at).split(' ')[1]}</span>
+              {shift.opened_by_name && <span className="hidden sm:inline"> · {shift.opened_by_name}</span>}
+              <span className="hidden text-emerald-600/70 sm:inline dark:text-emerald-400/70">
+                {' '}· нач. касса {formatMoney(shift.cash_start)}
+              </span>
             </span>
           ) : (
             <span className="text-amber-800 dark:text-amber-300">Смена не открыта</span>
@@ -84,7 +90,7 @@ export default function ShiftBar() {
         {shift ? (
           <button
             onClick={() => setCloseModal(true)}
-            className="shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 bg-white dark:bg-gray-900 border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+            className="shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 bg-surface border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
           >
             Закрыть смену
           </button>
@@ -92,7 +98,7 @@ export default function ShiftBar() {
           <button
             onClick={() => setOpenModal(true)}
             disabled={!shop}
-            className="shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-40"
+            className="shrink-0 text-xs font-semibold rounded-lg px-3 py-1.5 bg-surface border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 disabled:opacity-40"
           >
             Открыть смену
           </button>
@@ -105,10 +111,10 @@ export default function ShiftBar() {
         title="Открыть смену"
         footer={
           <>
-            <button onClick={() => setOpenModal(false)} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <button onClick={() => setOpenModal(false)} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">
               Отмена
             </button>
-            <button onClick={openShift} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-60">
+            <button onClick={openShift} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
               {saving && <Loader2 className="animate-spin" size={14} />} Открыть
             </button>
           </>
@@ -117,13 +123,13 @@ export default function ShiftBar() {
         <div className="space-y-3">
           <p className="text-sm text-gray-500">Склад: {shop?.name ?? '—'}</p>
           <div>
-            <label className="text-xs text-gray-500">Наличные в кассе на начало смены</label>
+            <label className="text-xs font-medium text-fg-muted">Наличные в кассе на начало смены</label>
             <input
               type="number"
               value={cashStart}
               onChange={(e) => setCashStart(e.target.value)}
               autoFocus
-              className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
+              className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
             />
           </div>
         </div>
@@ -135,10 +141,10 @@ export default function ShiftBar() {
         title="Закрыть смену"
         footer={
           <>
-            <button onClick={() => setCloseModal(false)} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+            <button onClick={() => setCloseModal(false)} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">
               Отмена
             </button>
-            <button onClick={closeShift} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-60">
+            <button onClick={closeShift} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
               {saving && <Loader2 className="animate-spin" size={14} />} Закрыть смену
             </button>
           </>
@@ -149,14 +155,14 @@ export default function ShiftBar() {
             Посчитайте наличные в кассе и укажите фактическую сумму. Система сравнит её с ожидаемой суммой по продажам.
           </p>
           <div>
-            <label className="text-xs text-gray-500">Фактически наличных в кассе</label>
+            <label className="text-xs font-medium text-fg-muted">Фактически наличных в кассе</label>
             <input
               type="number"
               value={cashFact}
               onChange={(e) => setCashFact(e.target.value)}
               autoFocus
               placeholder="0"
-              className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
+              className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
             />
           </div>
         </div>
@@ -167,7 +173,7 @@ export default function ShiftBar() {
         onClose={() => setClosedResult(null)}
         title="Смена закрыта"
         footer={
-          <button onClick={() => setClosedResult(null)} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900">
+          <button onClick={() => setClosedResult(null)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
             Готово
           </button>
         }
@@ -182,7 +188,7 @@ export default function ShiftBar() {
               <span>Ожидалось по системе</span>
               <span className="tabular-nums">{formatMoney(closedResult.cash_end_system ?? 0)}</span>
             </div>
-            <div className="flex justify-between font-medium text-gray-900 dark:text-gray-100">
+            <div className="flex justify-between font-medium text-fg">
               <span>Фактически</span>
               <span className="tabular-nums">{formatMoney(closedResult.cash_end_fact ?? 0)}</span>
             </div>

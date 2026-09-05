@@ -6,6 +6,7 @@ import { useBrands, useCategories } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import Modal from '@/components/Modal'
 import type { Product } from '@/api/types'
+import { fieldClass } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -172,10 +173,10 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
       width="max-w-2xl"
       footer={
         <>
-          <button onClick={onClose} disabled={saving} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button onClick={onClose} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">
             Отмена
           </button>
-          <button onClick={handleSubmit} disabled={saving || !canSave} className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 flex items-center gap-2 disabled:opacity-40">
+          <button onClick={handleSubmit} disabled={saving || !canSave} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
             {saving && <Loader2 className="animate-spin" size={14} />} {isEdit ? 'Сохранить' : 'Создать товар'}
           </button>
         </>
@@ -183,24 +184,24 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
     >
       <div className="space-y-3">
         <div>
-          <label className="text-xs text-gray-500">Название *</label>
-          <input value={form.name} onChange={(e) => set('name', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" placeholder="Фильтр масляный Toyota Camry 2.5" />
+          <label className="text-xs font-medium text-fg-muted">Название *</label>
+          <input value={form.name} onChange={(e) => set('name', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="Фильтр масляный Toyota Camry 2.5" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500">Код (SKU) {isEdit && '— нельзя изменить'}</label>
+            <label className="text-xs font-medium text-fg-muted">Код (SKU) {isEdit && '— нельзя изменить'}</label>
             <input
               value={form.sku}
               disabled={isEdit}
               onChange={(e) => set('sku', e.target.value)}
               placeholder="автоматически, если пусто"
-              className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none disabled:opacity-50"
+              className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none disabled:opacity-50"
             />
           </div>
           <div>
-            <label className="text-xs text-gray-500">OEM-код</label>
-            <input value={form.oem_code} onChange={(e) => set('oem_code', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" placeholder="90915-YZZD4" />
+            <label className="text-xs font-medium text-fg-muted">OEM-код</label>
+            <input value={form.oem_code} onChange={(e) => set('oem_code', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="90915-YZZD4" />
           </div>
         </div>
 
@@ -214,11 +215,11 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
             </label>
             {addingBrand ? (
               <div className="flex gap-1 mt-1">
-                <input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Название бренда" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
-                <button type="button" onClick={createBrand} className="px-3 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm">OK</button>
+                <input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Название бренда" className="flex-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none" />
+                <button type="button" onClick={createBrand} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white px-3">OK</button>
               </div>
             ) : (
-              <select value={form.brand} onChange={(e) => set('brand', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none">
+              <select value={form.brand} onChange={(e) => set('brand', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
                 <option value="">—</option>
                 {brands?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
@@ -233,11 +234,11 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
             </label>
             {addingCategory ? (
               <div className="flex gap-1 mt-1">
-                <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
-                <button type="button" onClick={createCategory} className="px-3 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm">OK</button>
+                <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none" />
+                <button type="button" onClick={createCategory} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white px-3">OK</button>
               </div>
             ) : (
-              <select value={form.category} onChange={(e) => set('category', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none">
+              <select value={form.category} onChange={(e) => set('category', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
                 <option value="">—</option>
                 {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -247,51 +248,51 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
 
         <div className="grid grid-cols-4 gap-3">
           <div>
-            <label className="text-xs text-gray-500">Ед. изм.</label>
-            <select value={form.unit} onChange={(e) => set('unit', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none">
+            <label className="text-xs font-medium text-fg-muted">Ед. изм.</label>
+            <select value={form.unit} onChange={(e) => set('unit', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
               {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-gray-500">Розничная цена</label>
-            <input type="number" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
+            <label className="text-xs font-medium text-fg-muted">Розничная цена</label>
+            <input type="number" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Мин. цена продажи</label>
-            <input type="number" value={form.min_price} onChange={(e) => set('min_price', e.target.value)} placeholder="= себестоимость" className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
+            <label className="text-xs font-medium text-fg-muted">Мин. цена продажи</label>
+            <input type="number" value={form.min_price} onChange={(e) => set('min_price', e.target.value)} placeholder="= себестоимость" className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Порог дефицита</label>
-            <input type="number" value={form.min_stock} onChange={(e) => set('min_stock', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
+            <label className="text-xs font-medium text-fg-muted">Порог дефицита</label>
+            <input type="number" value={form.min_stock} onChange={(e) => set('min_stock', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
           </div>
         </div>
 
         {!isEdit && (
           <div>
-            <label className="text-xs text-gray-500">Ориентировочная закупочная цена (опционально — точная цена задаётся приходом)</label>
-            <input type="number" value={form.purchase_price} onChange={(e) => set('purchase_price', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
+            <label className="text-xs font-medium text-fg-muted">Ориентировочная закупочная цена (опционально — точная цена задаётся приходом)</label>
+            <input type="number" value={form.purchase_price} onChange={(e) => set('purchase_price', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
           </div>
         )}
 
         <div>
-          <label className="text-xs text-gray-500">Применимость к авто</label>
-          <input value={form.applicability} onChange={(e) => set('applicability', e.target.value)} placeholder="Toyota Camry 40/50, Lexus ES 2006–2012" className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
+          <label className="text-xs font-medium text-fg-muted">Применимость к авто</label>
+          <input value={form.applicability} onChange={(e) => set('applicability', e.target.value)} placeholder="Toyota Camry 40/50, Lexus ES 2006–2012" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500">Место на складе</label>
-            <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Стеллаж B, полка 3" className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
+            <label className="text-xs font-medium text-fg-muted">Место на складе</label>
+            <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Стеллаж B, полка 3" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
           </div>
           <div>
-            <label className="text-xs text-gray-500">Штрихкод</label>
-            <input value={form.barcode} onChange={(e) => set('barcode', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
+            <label className="text-xs font-medium text-fg-muted">Штрихкод</label>
+            <input value={form.barcode} onChange={(e) => set('barcode', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
           </div>
         </div>
 
         <div>
-          <label className="text-xs text-gray-500">Комментарий</label>
-          <input value={form.note} onChange={(e) => set('note', e.target.value)} className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm outline-none" />
+          <label className="text-xs font-medium text-fg-muted">Комментарий</label>
+          <input value={form.note} onChange={(e) => set('note', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
         </div>
 
         {isEdit && (

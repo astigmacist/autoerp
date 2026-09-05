@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Plus, Archive, ArchiveRestore } from 'lucide-react'
+import { Pencil, Plus, Archive, ArchiveRestore, Package } from 'lucide-react'
 import { useProducts } from '@/api/queries'
 import { useAuth } from '@/store/auth'
 import { formatMoney, formatQty } from '@/lib/format'
@@ -8,6 +8,7 @@ import { useToast } from '@/store/toast'
 import { useQueryClient } from '@tanstack/react-query'
 import ProductFormModal from '@/components/ProductFormModal'
 import type { Product } from '@/api/types'
+import { Card, EmptyState, SkeletonList, SkeletonRows, Toggle, fieldClass } from '@/components/ui'
 
 export default function Products() {
   const [search, setSearch] = useState('')
@@ -48,33 +49,32 @@ export default function Products() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         {/* На телефоне это же название уже показано в верхней полосе. */}
-        <h1 className="hidden md:block text-xl font-semibold text-gray-900 dark:text-gray-100">Товары</h1>
+        <h1 className="hidden md:block text-xl font-semibold text-fg">Товары</h1>
         <div className="flex w-full md:w-auto items-center gap-2 flex-wrap">
           <input
             placeholder="Поиск по названию, коду, OEM…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-40 md:flex-none md:w-72 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] px-3 py-2.5 md:py-2 text-sm outline-none"
+            className={`flex-1 min-w-40 md:flex-none md:w-72 ${fieldClass} h-11 md:h-10`}
           />
           {canManage && (
             <button
               onClick={openCreate}
-              className="flex shrink-0 items-center gap-1.5 px-3.5 py-2.5 md:py-2 rounded-xl text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white shrink-0"
             >
               <Plus size={15} /> Новый товар
             </button>
           )}
-          <label className="flex w-full md:w-auto items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
-            показывать архивные
-          </label>
+          <Toggle checked={showInactive} onChange={setShowInactive}>
+            Архивные
+          </Toggle>
         </div>
       </div>
 
       {/* На телефоне таблица из восьми колонок нечитаема — там карточки. */}
       <div className="md:hidden space-y-2">
-        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
-        {!isLoading && rows.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Ничего не найдено</div>}
+        {isLoading && <SkeletonList rows={3} />}
+        {!isLoading && rows.length === 0 && <Card padded={false}><EmptyState icon={<Package size={20} />} title="Ничего не найдено" /></Card>}
         {rows.map((p) => {
           const main = p.stocks.find((s) => s.warehouse_code === 'MAIN')
           const shop = p.stocks.find((s) => s.warehouse_code === 'SHOP')
@@ -82,11 +82,11 @@ export default function Products() {
           return (
             <div
               key={p.id}
-              className={`rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3 ${!p.is_active ? 'opacity-60' : ''}`}
+              className={`rounded-2xl border border-line bg-surface p-3 ${!p.is_active ? 'opacity-60' : ''}`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{p.name}</div>
+                  <div className="font-medium text-fg">{p.name}</div>
                   <div className="text-xs text-gray-400">
                     {p.sku}
                     {p.oem_code && ` · ${p.oem_code}`}
@@ -113,9 +113,9 @@ export default function Products() {
                   </div>
                 )}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
                 <span>
-                  Цена <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">{formatMoney(p.sale_price)}</span>
+                  Цена <span className="font-semibold tabular-nums text-fg">{formatMoney(p.sale_price)}</span>
                 </span>
                 {permissions?.can_see_cost && (
                   <span>Себестоимость <span className="tabular-nums">{p.avg_cost ? formatMoney(p.avg_cost) : '—'}</span></span>
@@ -130,9 +130,9 @@ export default function Products() {
         })}
       </div>
 
-      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-x-auto">
+      <div className="hidden md:block rounded-2xl border border-line bg-surface overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">
-          <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
+          <thead className="bg-surface-muted text-fg-muted">
             <tr>
               <th className="text-left font-medium px-4 py-2.5">Товар</th>
               <th className="text-left font-medium px-2 py-2.5">OEM</th>
@@ -144,12 +144,12 @@ export default function Products() {
               {canManage && <th className="text-right font-medium px-4 py-2.5"></th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody className="divide-y divide-line">
             {isLoading && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Загрузка…</td></tr>
+              <SkeletonRows rows={4} cols={8} />
             )}
             {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Ничего не найдено</td></tr>
+              <tr><td colSpan={8} className="px-4 py-4"><EmptyState icon={<Package size={20} />} title="Ничего не найдено" /></td></tr>
             )}
             {rows.map((p) => {
               const main = p.stocks.find((s) => s.warehouse_code === 'MAIN')
@@ -157,11 +157,11 @@ export default function Products() {
               return (
                 <tr key={p.id} className={!p.is_active ? 'opacity-50' : ''}>
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-gray-900 dark:text-gray-100">{p.name}</div>
+                    <div className="font-medium text-fg">{p.name}</div>
                     <div className="text-xs text-gray-400">{p.sku}{!p.is_active && ' · в архиве'}</div>
                   </td>
-                  <td className="px-2 py-2.5 text-gray-500">{p.oem_code || '—'}</td>
-                  <td className="px-2 py-2.5 text-gray-500">{p.brand_name || '—'}</td>
+                  <td className="whitespace-nowrap px-2 py-2.5 text-fg-muted">{p.oem_code || '—'}</td>
+                  <td className="whitespace-nowrap px-2 py-2.5 text-fg-muted">{p.brand_name || '—'}</td>
                   <td className="px-2 py-2.5 text-right font-medium tabular-nums">{formatMoney(p.sale_price)}</td>
                   {permissions?.can_see_cost && (
                     <td className="px-2 py-2.5 text-right text-gray-500 tabular-nums">{p.avg_cost ? formatMoney(p.avg_cost) : '—'}</td>
@@ -172,18 +172,18 @@ export default function Products() {
                   </td>
                   {canManage && (
                     <td className="px-4 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="row-actions flex items-center justify-end gap-1">
                         <button
                           onClick={() => openEdit(p)}
                           title="Редактировать"
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
                         >
                           <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => toggleActive(p)}
                           title={p.is_active ? 'В архив' : 'Восстановить'}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
                         >
                           {p.is_active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
                         </button>

@@ -24,7 +24,7 @@ interface Props {
 export default function AddProductBar({ onSelect, onCreateNew, placeholder, label = 'Добавить товар' }: Props) {
   return (
     <div>
-      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">{label}</div>
+      <div className="text-xs text-fg-muted mb-1.5">{label}</div>
 
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <span className="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 dark:bg-gray-100 px-3 py-2 text-sm font-medium text-white dark:text-gray-900">
@@ -36,7 +36,7 @@ export default function AddProductBar({ onSelect, onCreateNew, placeholder, labe
             <button
               type="button"
               onClick={() => onCreateNew('')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line-strong px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <PackagePlus size={15} /> Новый товар
             </button>
