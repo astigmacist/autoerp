@@ -6,7 +6,7 @@ import { useWarehouses, useWriteOffs } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import { formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
-import ProductPicker from '@/components/ProductPicker'
+import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { ProductSearchResult, WriteOff } from '@/api/types'
 
@@ -105,7 +105,32 @@ export default function WriteOffs() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
+      {/* На телефоне — карточки: в таблицу из шести колонок экран не помещается. */}
+      <div className="md:hidden space-y-2">
+        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
+        {docs?.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Списаний ещё не было</div>}
+        {docs?.map((d) => (
+          <div key={d.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{d.number}</div>
+                <div className="text-xs text-gray-400">{formatDate(d.date)} · {d.warehouse_name}{d.reason_text && ` · ${d.reason_text}`}</div>
+              </div>
+              <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span>
+            </div>
+            {d.status === 'draft' && (
+              <button
+                onClick={() => setConfirmDoc(d)}
+                className="mt-2 w-full rounded-xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 py-2.5 text-sm font-semibold"
+              >
+                Провести
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
             <tr>
@@ -167,8 +192,7 @@ export default function WriteOffs() {
           </div>
 
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Добавить товар</label>
-            <ProductPicker onSelect={addLine} />
+            <AddProductBar onSelect={addLine} />
           </div>
 
           {lines.length > 0 && (

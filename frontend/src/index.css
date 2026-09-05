@@ -1,7 +1,16 @@
 @import "tailwindcss";
 
+/* Тема переключается вручную (кнопка в интерфейсе), а не системной настройкой:
+   в магазине за одним компьютером работают разные люди, и «как в системе»
+   их не устраивает. Эта строка переводит все утилиты dark:* с медиазапроса
+   prefers-color-scheme на класс .dark у <html>, которым управляет store/theme.ts. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* color-scheme управляет видом системных элементов — календарей у полей с
+   датой, выпадающих списков, полос прокрутки. Раз тема теперь выбирается
+   вручную, он должен следовать выбору, а не системе. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   /* Recharts <Tooltip> renders its own popup outside of any component we
      control, styled via inline `contentStyle`/`labelStyle`/`itemStyle`
@@ -14,15 +23,8 @@
   --chart-tooltip-border: #e5e7eb;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --chart-tooltip-bg: #1b1d24;
-    --chart-tooltip-fg: #e5e7eb;
-    --chart-tooltip-border: #33353f;
-  }
-}
-
 .dark {
+  color-scheme: dark;
   --chart-tooltip-bg: #1b1d24;
   --chart-tooltip-fg: #e5e7eb;
   --chart-tooltip-border: #33353f;
@@ -44,33 +46,11 @@ body {
   color: #16171d;
 }
 
-/*
- * This app has no manual theme toggle (yet) — dark mode is driven purely by
- * the OS/browser's `prefers-color-scheme`, which is what every `dark:`
- * Tailwind utility in the app compiles to by default. A `.dark`-class
- * selector alone is dead code here: nothing in the app ever adds that class
- * to <html>/<body>, so it never fires.
- *
- * That mattered a lot: every plain <input>/<select> in the app relies on
- * Tailwind's preflight `color: inherit` and has no explicit text-color
- * class of its own, so its text color is whatever `body`'s computed color
- * is. With only the (dead) `.dark body` rule below, body's color stayed
- * permanently `#16171d` (near-black) even with the OS in dark mode, while
- * those same fields' backgrounds correctly went dark via `dark:bg-*` — near
- * -black text on a near-black field background, i.e. invisible typed text
- * everywhere. Mirroring the same colors under the media query fixes the
- * inherited base for every element that doesn't set its own text color.
- * The `.dark` rules stay too, so a future manual toggle (see README "Что
- * дальше") can just add that class and take over from the media query.
- */
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #0f1115;
-    color: #e5e7eb;
-  }
-  ::-webkit-scrollbar-thumb { background: #3f414b; }
-}
-
+/* Базовые цвета страницы. Важно: у полей ввода и <select> нет собственного
+ * класса с цветом текста — они наследуют цвет от body (Tailwind сбрасывает
+ * им color на inherit). Пока эти правила висели на классе, который никто не
+ * ставил, в тёмной теме получался почти чёрный текст на почти чёрном фоне —
+ * то есть невидимый ввод во всех формах, включая вход. */
 .dark body {
   background: #0f1115;
   color: #e5e7eb;

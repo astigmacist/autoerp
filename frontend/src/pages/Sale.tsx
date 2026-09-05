@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle } from 'lucide-react'
+import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Tag } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useProductSearch, useWarehouses } from '@/api/queries'
 import { useAuth } from '@/store/auth'
@@ -12,6 +12,7 @@ import type { PaymentMethod, ProductSearchResult, Sale } from '@/api/types'
 interface CartLine {
   product: ProductSearchResult
   quantity: number
+  /** Цена продажи за единицу — то, что продавец может снизить при торге. */
   finalPrice: number
 }
 
@@ -21,8 +22,16 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string }[] = [
   { value: 'card', label: 'Карта' },
 ]
 
+/** Быстрые скидки — самые ходовые значения при торге в зале. */
+const QUICK_DISCOUNTS = [5, 10, 15]
+
 function uuid() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+}
+
+function discountPercent(base: number, price: number): number {
+  if (!base || price >= base) return 0
+  return ((base - price) / base) * 100
 }
 
 export default function SalePage() {
@@ -79,6 +88,23 @@ export default function SalePage() {
     setCart((prev) => prev.map((l) => (l.product.id === id ? { ...l, finalPrice: Math.max(0, price) } : l)))
   }
 
+  /** Скидка в процентах от прайсовой цены — считаем цену продажи за продавца. */
+  function applyDiscount(id: string, percent: number) {
+    setCart((prev) =>
+      prev.map((l) => {
+        if (l.product.id !== id) return l
+        const base = parseFloat(l.product.sale_price)
+        return { ...l, finalPrice: Math.max(0, Math.round(base * (1 - percent / 100))) }
+      })
+    )
+  }
+
+  function resetPrice(id: string) {
+    setCart((prev) =>
+      prev.map((l) => (l.product.id === id ? { ...l, finalPrice: parseFloat(l.product.sale_price) } : l))
+    )
+  }
+
   function removeLine(id: string) {
     setCart((prev) => prev.filter((l) => l.product.id !== id))
   }
@@ -86,15 +112,16 @@ export default function SalePage() {
   const subtotal = cart.reduce((s, l) => s + parseFloat(l.product.sale_price) * l.quantity, 0)
   const total = cart.reduce((s, l) => s + l.finalPrice * l.quantity, 0)
   const discountTotal = subtotal - total
+  const discountPct = discountPercent(subtotal, total)
   const change = payMethod === 'cash' && customerReceived ? Math.max(0, parseFloat(customerReceived) - total) : null
 
   const limit = permissions?.discount_limit_percent
-  const overLimitLines = cart.filter((l) => {
+  const isOverLimit = (l: CartLine) => {
     const base = parseFloat(l.product.sale_price)
     if (!base || limit === null || limit === undefined) return false
-    const pct = ((base - l.finalPrice) / base) * 100
-    return pct > limit
-  })
+    return discountPercent(base, l.finalPrice) > limit
+  }
+  const overLimitLines = cart.filter(isOverLimit)
   const belowCostWarning = cart.some((l) => l.finalPrice <= 0)
 
   function resetSale() {
@@ -136,10 +163,11 @@ export default function SalePage() {
   const canConfirm = cart.length > 0 && (!splitMode || Math.abs(splitSum - total) < 0.01)
 
   return (
-    <div className="grid lg:grid-cols-[1fr_380px] gap-4">
+    <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-4 space-y-4 lg:space-y-0">
       <div className="lg:col-span-2">
         <ShiftBar />
       </div>
+
       <div className="space-y-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -148,7 +176,7 @@ export default function SalePage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск по названию, коду, OEM или штрихкоду…"
-            className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100"
+            className="w-full rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] pl-10 pr-4 py-3 text-base sm:text-sm outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-100"
           />
           {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={16} />}
         </div>
@@ -168,7 +196,7 @@ export default function SalePage() {
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-sm font-semibold tabular-nums">{formatMoney(p.sale_price)}</div>
-                  <div className={`text-xs ${p.shop_qty < p.min_stock ? 'text-red-600' : 'text-gray-400'}`}>
+                  <div className={`text-xs ${p.shop_qty < p.min_stock ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
                     на витрине: {formatQty(p.shop_qty)}
                   </div>
                 </div>
@@ -177,89 +205,147 @@ export default function SalePage() {
           </div>
         )}
 
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
-              <tr>
-                <th className="text-left font-medium px-4 py-2.5">Товар</th>
-                <th className="text-center font-medium px-2 py-2.5 w-32">Кол-во</th>
-                <th className="text-right font-medium px-2 py-2.5 w-32">Цена</th>
-                <th className="text-right font-medium px-4 py-2.5 w-28">Сумма</th>
-                <th className="w-10" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {cart.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-400 text-sm">
-                    Корзина пуста. Найдите товар выше.
-                  </td>
-                </tr>
-              )}
-              {cart.map((l) => {
-                const base = parseFloat(l.product.sale_price)
-                const hasDiscount = l.finalPrice < base
-                return (
-                  <tr key={l.product.id}>
-                    <td className="px-4 py-2.5">
+        {/* Корзина. Карточками, а не таблицей: на телефоне таблица с ценой,
+            количеством и скидкой не помещается, а на компьютере карточка
+            позволяет крупно показать и прайс, и цену продажи, и размер скидки. */}
+        {cart.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 px-4 py-12 text-center text-sm text-gray-400">
+            Корзина пуста. Найдите товар в строке поиска выше.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {cart.map((l) => {
+              const base = parseFloat(l.product.sale_price)
+              const pct = discountPercent(base, l.finalPrice)
+              const hasDiscount = pct > 0
+              const overLimit = isOverLimit(l)
+              return (
+                <div
+                  key={l.product.id}
+                  className={`rounded-2xl border bg-white dark:bg-[#151720] p-3 sm:p-4 ${
+                    overLimit
+                      ? 'border-amber-300 dark:border-amber-800'
+                      : 'border-gray-200 dark:border-gray-800'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <div className="font-medium text-gray-900 dark:text-gray-100">{l.product.name}</div>
                       <div className="text-xs text-gray-400">{l.product.sku}</div>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => updateQty(l.product.id, l.quantity - 1)} className="w-6 h-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
-                          <Minus size={12} />
+                    </div>
+                    <button
+                      onClick={() => removeLine(l.product.id)}
+                      aria-label="Убрать из корзины"
+                      className="shrink-0 flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* На телефоне два поля делят ширину пополам, на большом
+                      экране растягивать их на пол-карточки незачем. */}
+                  <div className="mt-3 grid grid-cols-2 sm:grid-cols-[11rem_13rem] gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Количество</div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateQty(l.product.id, l.quantity - 1)}
+                          aria-label="Меньше"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                        >
+                          <Minus size={14} />
                         </button>
                         <input
+                          inputMode="decimal"
                           value={l.quantity}
                           onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
-                          className="w-12 text-center bg-transparent outline-none tabular-nums"
+                          className="w-full min-w-0 h-10 text-center rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent outline-none tabular-nums text-gray-900 dark:text-gray-100"
                         />
-                        <button onClick={() => updateQty(l.product.id, l.quantity + 1)} className="w-6 h-6 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center">
-                          <Plus size={12} />
+                        <button
+                          onClick={() => updateQty(l.product.id, l.quantity + 1)}
+                          aria-label="Больше"
+                          className="h-10 w-10 shrink-0 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                        >
+                          <Plus size={14} />
                         </button>
                       </div>
-                    </td>
-                    <td className="px-2 py-2.5">
+                    </div>
+
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Цена продажи, ₸</div>
                       <input
+                        inputMode="numeric"
                         value={l.finalPrice}
                         onChange={(e) => updatePrice(l.product.id, parseFloat(e.target.value) || 0)}
-                        className={`w-full text-right bg-transparent outline-none tabular-nums font-medium rounded-lg px-1 ${
-                          hasDiscount ? 'text-amber-600' : 'text-gray-900 dark:text-gray-100'
+                        className={`w-full h-10 rounded-xl border bg-transparent px-3 text-right outline-none tabular-nums font-semibold ${
+                          hasDiscount
+                            ? 'border-amber-300 dark:border-amber-800 text-amber-600 dark:text-amber-400'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100'
                         }`}
                       />
-                      {hasDiscount && (
-                        <div className="text-right text-[11px] text-amber-600">
-                          −{formatMoney((base - l.finalPrice) * l.quantity)}
-                        </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Цена по прайсу <span className={`tabular-nums ${hasDiscount ? 'line-through' : ''}`}>{formatMoney(base)}</span>
+                      </span>
+                      {hasDiscount ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 font-medium text-amber-700 dark:text-amber-300">
+                          <Tag size={11} />
+                          Скидка −{formatMoney((base - l.finalPrice) * l.quantity)} ({pct.toFixed(pct < 10 ? 1 : 0)}%)
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">Без скидки</span>
                       )}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                    </div>
+                    <div className="ml-auto font-semibold text-sm tabular-nums text-gray-900 dark:text-gray-100">
                       {formatMoney(l.finalPrice * l.quantity)}
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <button onClick={() => removeLine(l.product.id)} className="text-gray-300 hover:text-red-500">
-                        <Trash2 size={16} />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {QUICK_DISCOUNTS.map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => applyDiscount(l.product.id, d)}
+                        className="rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        −{d}%
                       </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    ))}
+                    {hasDiscount && (
+                      <button
+                        onClick={() => resetPrice(l.product.id)}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        <RotateCcw size={11} /> Вернуть прайс
+                      </button>
+                    )}
+                    {overLimit && (
+                      <span className="text-xs text-amber-700 dark:text-amber-300">
+                        выше лимита {limit}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Checkout panel */}
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-4 h-fit sticky top-4 space-y-4">
+      {/* Панель оплаты: справа на компьютере, внизу страницы на телефоне */}
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-4 h-fit lg:sticky lg:top-4 space-y-4">
         <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between text-gray-500">
+          <div className="flex justify-between text-gray-500 dark:text-gray-400">
             <span>Сумма по прайсу</span>
             <span className="tabular-nums">{formatMoney(subtotal)}</span>
           </div>
           {discountTotal > 0 && (
-            <div className="flex justify-between text-amber-600">
-              <span>Скидка</span>
+            <div className="flex justify-between text-amber-600 dark:text-amber-400">
+              <span>Скидка {discountPct >= 0.5 && `(${discountPct.toFixed(discountPct < 10 ? 1 : 0)}%)`}</span>
               <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
             </div>
           )}
@@ -296,7 +382,7 @@ export default function SalePage() {
                 <button
                   key={opt.value}
                   onClick={() => setPayMethod(opt.value)}
-                  className={`rounded-xl border px-2 py-2.5 text-sm font-medium transition-colors ${
+                  className={`rounded-xl border px-2 py-3 text-sm font-medium transition-colors ${
                     payMethod === opt.value
                       ? 'border-gray-900 dark:border-gray-100 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
                       : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
@@ -313,16 +399,17 @@ export default function SalePage() {
                   <span className="text-sm text-gray-600 dark:text-gray-300 w-24">{opt.label}</span>
                   <input
                     type="number"
+                    inputMode="numeric"
                     value={splitAmounts[opt.value] || ''}
                     onChange={(e) =>
                       setSplitAmounts((prev) => ({ ...prev, [opt.value]: parseFloat(e.target.value) || 0 }))
                     }
-                    className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm text-right tabular-nums outline-none"
+                    className="flex-1 h-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-sm text-right tabular-nums outline-none text-gray-900 dark:text-gray-100"
                     placeholder="0"
                   />
                 </div>
               ))}
-              <div className={`text-xs text-right ${Math.abs(splitSum - total) < 0.01 ? 'text-emerald-600' : 'text-red-600'}`}>
+              <div className={`text-xs text-right ${Math.abs(splitSum - total) < 0.01 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                 Введено: {formatMoney(splitSum)} из {formatMoney(total)}
               </div>
             </div>
@@ -331,16 +418,17 @@ export default function SalePage() {
 
         {!splitMode && payMethod === 'cash' && (
           <div>
-            <label className="text-xs text-gray-500">Получено наличными</label>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Получено наличными</label>
             <input
               type="number"
+              inputMode="numeric"
               value={customerReceived}
               onChange={(e) => setCustomerReceived(e.target.value)}
-              className="w-full mt-1 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
+              className="w-full mt-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-transparent px-3 text-sm tabular-nums outline-none text-gray-900 dark:text-gray-100"
               placeholder={String(total)}
             />
             {change !== null && customerReceived && (
-              <div className="text-xs text-emerald-600 mt-1">Сдача: {formatMoney(change)}</div>
+              <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Сдача: {formatMoney(change)}</div>
             )}
           </div>
         )}
@@ -353,6 +441,34 @@ export default function SalePage() {
           Оформить продажу
         </button>
       </div>
+
+      {/* Итог и кнопка всегда под рукой на телефоне: корзина длинная, а
+          прокручивать вниз к панели оплаты ради каждой продажи неудобно. */}
+      {cart.length > 0 && (
+        <div className="lg:hidden fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-[#151720]/95 backdrop-blur px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                Итого{discountTotal > 0 && ` · скидка ${formatMoney(discountTotal)}`}
+              </div>
+              <div className="text-lg font-semibold tabular-nums text-gray-900 dark:text-gray-100 leading-tight">
+                {formatMoney(total)}
+              </div>
+            </div>
+            <button
+              disabled={!canConfirm}
+              onClick={() => setConfirmOpen(true)}
+              className="ml-auto shrink-0 rounded-xl bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-5 py-3 text-sm font-semibold disabled:opacity-40"
+            >
+              Оформить
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Пустое место под плавающей панелью итога, иначе она закрывает
+          нижнюю часть корзины при прокрутке до конца. */}
+      {cart.length > 0 && <div className="lg:hidden h-24" aria-hidden />}
 
       <Modal
         open={confirmOpen}
@@ -379,21 +495,30 @@ export default function SalePage() {
         }
       >
         <div className="space-y-2 text-sm">
-          {cart.map((l) => (
-            <div key={l.product.id} className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-300">
-                {l.product.name} ×{formatQty(l.quantity)}
-              </span>
-              <span className="font-medium tabular-nums">{formatMoney(l.finalPrice * l.quantity)}</span>
-            </div>
-          ))}
+          {cart.map((l) => {
+            const base = parseFloat(l.product.sale_price)
+            const pct = discountPercent(base, l.finalPrice)
+            return (
+              <div key={l.product.id} className="flex justify-between gap-3">
+                <span className="text-gray-600 dark:text-gray-300 min-w-0">
+                  {l.product.name} ×{formatQty(l.quantity)}
+                  {pct > 0 && (
+                    <span className="block text-xs text-amber-600 dark:text-amber-400">
+                      {formatMoney(base)} → {formatMoney(l.finalPrice)} (−{pct.toFixed(pct < 10 ? 1 : 0)}%)
+                    </span>
+                  )}
+                </span>
+                <span className="font-medium tabular-nums shrink-0">{formatMoney(l.finalPrice * l.quantity)}</span>
+              </div>
+            )
+          })}
           <div className="border-t border-gray-100 dark:border-gray-800 pt-2 space-y-1">
-            <div className="flex justify-between text-gray-500">
+            <div className="flex justify-between text-gray-500 dark:text-gray-400">
               <span>Сумма по прайсу</span>
               <span className="tabular-nums">{formatMoney(subtotal)}</span>
             </div>
             {discountTotal > 0 && (
-              <div className="flex justify-between text-amber-600">
+              <div className="flex justify-between text-amber-600 dark:text-amber-400">
                 <span>Скидка</span>
                 <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
               </div>
@@ -402,7 +527,7 @@ export default function SalePage() {
               <span>Итого к оплате</span>
               <span className="tabular-nums">{formatMoney(total)}</span>
             </div>
-            <div className="text-gray-500 pt-1">
+            <div className="text-gray-500 dark:text-gray-400 pt-1">
               Оплата: {splitMode ? 'смешанная' : PAYMENT_OPTIONS.find((o) => o.value === payMethod)?.label}
             </div>
           </div>

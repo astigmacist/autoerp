@@ -53,7 +53,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Дашборд</h1>
+        {/* На телефоне это же название уже показано в верхней полосе. */}
+        <h1 className="hidden md:block text-xl font-semibold text-gray-900 dark:text-gray-100">Дашборд</h1>
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
           {PERIODS.map((p) => (
             <button

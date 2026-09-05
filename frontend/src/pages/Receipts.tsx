@@ -7,7 +7,7 @@ import { useToast } from '@/store/toast'
 import { useAuth } from '@/store/auth'
 import { formatMoney, formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
-import ProductPicker from '@/components/ProductPicker'
+import AddProductBar from '@/components/AddProductBar'
 import ProductFormModal from '@/components/ProductFormModal'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { Product, ProductSearchResult, Receipt } from '@/api/types'
@@ -145,7 +145,33 @@ export default function Receipts() {
         </button>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
+      {/* На телефоне — карточки: в таблицу из шести колонок экран не помещается. */}
+      <div className="md:hidden space-y-2">
+        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
+        {receipts?.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Приходов ещё нет</div>}
+        {receipts?.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{r.number}</div>
+                <div className="text-xs text-gray-400">{formatDate(r.date)} · {r.warehouse_name}{r.supplier_name && ` · ${r.supplier_name}`}</div>
+              </div>
+              <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${STATUS_CLS[r.status]}`}>{STATUS_LABELS[r.status]}</span>
+            </div>
+            <div className="mt-2 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">{formatMoney(r.total_amount ?? 0)}</div>
+            {r.status === 'draft' && (
+              <button
+                onClick={() => setConfirmDoc(r)}
+                className="mt-2 w-full rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 py-2.5 text-sm font-semibold"
+              >
+                Провести
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
             <tr>
@@ -218,20 +244,17 @@ export default function Receipts() {
             </select>
           </div>
 
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Добавить товар</label>
-            <ProductPicker
-              onSelect={addLine}
-              onCreateNew={
-                permissions?.can_manage_catalog
-                  ? (name) => {
-                      setNewProductName(name)
-                      setNewProductOpen(true)
-                    }
-                  : undefined
-              }
-            />
-          </div>
+          <AddProductBar
+            onSelect={addLine}
+            onCreateNew={
+              permissions?.can_manage_catalog
+                ? (name) => {
+                    setNewProductName(name)
+                    setNewProductOpen(true)
+                  }
+                : undefined
+            }
+          />
 
           {lines.length > 0 && (
             <div className="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">

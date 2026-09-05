@@ -30,7 +30,8 @@ export default function SalesJournal() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Продажи</h1>
+        {/* На телефоне это же название уже показано в верхней полосе. */}
+        <h1 className="hidden md:block text-xl font-semibold text-gray-900 dark:text-gray-100">Продажи</h1>
         <div className="flex items-center gap-2">
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] px-3 py-2 text-sm outline-none" />
           <span className="text-gray-400 text-sm">—</span>
@@ -38,7 +39,42 @@ export default function SalesJournal() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
+      <div className="md:hidden space-y-2">
+        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
+        {data?.results.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Продаж не найдено</div>}
+        {data?.results.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => navigate(`/sales/${s.id}`)}
+            className="w-full text-left rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{s.number}</div>
+                <div className="text-xs text-gray-400">{formatDateTime(s.created_at)} · {s.seller_name}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">{formatMoney(s.total)}</div>
+                {parseFloat(s.discount_total) > 0 && (
+                  <div className="text-xs text-amber-600 dark:text-amber-400 tabular-nums">−{formatMoney(s.discount_total)}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              <span className={`text-xs rounded-full px-2 py-0.5 ${
+                s.status === 'completed' ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+              }`}>
+                {STATUS_LABELS[s.status] ?? s.status}
+              </span>
+              {s.needs_approval && (
+                <span className="text-xs rounded-full px-2 py-0.5 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">сверхскидка</span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
             <tr>

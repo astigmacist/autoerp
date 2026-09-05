@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/store/auth'
+import { applyTheme, useTheme } from '@/store/theme'
 import { getApiError } from '@/api/client'
 import { Loader2, Wrench } from 'lucide-react'
 
@@ -9,7 +10,16 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const { login, isLoading } = useAuth()
+  const theme = useTheme((s) => s.theme)
   const navigate = useNavigate()
+
+  // Экран входа всегда светлый — это «витрина» продукта, её вид не должен
+  // зависеть от того, какую тему выбрал предыдущий пользователь. Выбранная
+  // тема возвращается сразу после ухода с этого экрана.
+  useEffect(() => {
+    applyTheme('light')
+    return () => applyTheme(theme)
+  }, [theme])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

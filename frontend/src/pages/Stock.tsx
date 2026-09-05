@@ -50,12 +50,12 @@ export default function Stock() {
       <WarehouseTabs />
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Остатки</h1>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex w-full md:w-auto items-center gap-2 flex-wrap">
           <input
             placeholder="Поиск…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] px-3 py-2 text-sm outline-none"
+            className="flex-1 min-w-32 sm:flex-none rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#151720] px-3 py-2.5 sm:py-2 text-sm outline-none"
           />
           <select
             value={warehouseId}
@@ -81,7 +81,22 @@ export default function Stock() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
+      <div className="md:hidden space-y-2">
+        {isLoading && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Загрузка…</div>}
+        {!isLoading && rows.length === 0 && <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] px-4 py-8 text-center text-sm text-gray-400">Ничего не найдено</div>}
+        {rows.map((r) => (
+          <div key={r.id} className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] p-3">
+            <div className="font-medium text-gray-900 dark:text-gray-100">{r.product_name}</div>
+            <div className="text-xs text-gray-400">{r.sku} · {r.warehouse_name}</div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <StockBadge status={r.status} quantity={r.quantity} />
+              <span className="text-xs text-gray-400">{formatDateTime(r.updated_at)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#151720] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400">
             <tr>
