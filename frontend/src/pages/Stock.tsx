@@ -56,12 +56,12 @@ export default function Stock() {
             placeholder="Поиск…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`flex-1 min-w-32 sm:flex-none ${fieldClass} h-11 md:h-10`}
+            className={`w-full md:w-56 ${fieldClass} h-11 md:h-10`}
           />
           <select
             value={warehouseId}
             onChange={(e) => setWarehouseId(e.target.value)}
-            className={`${fieldClass} h-11 md:h-10 w-auto`}
+            className={`${fieldClass} select-field h-11 md:h-10 w-full md:w-44`}
           >
             <option value="">Все склады</option>
             {warehouses?.map((w) => (

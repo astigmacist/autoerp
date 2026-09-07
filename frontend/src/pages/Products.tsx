@@ -55,12 +55,12 @@ export default function Products() {
             placeholder="Поиск по названию, коду, OEM…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`flex-1 min-w-40 md:flex-none md:w-72 ${fieldClass} h-11 md:h-10`}
+            className={`w-full md:w-72 ${fieldClass} h-11 md:h-10`}
           />
           {canManage && (
             <button
               onClick={openCreate}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white shrink-0"
+              className="inline-flex h-11 md:h-10 flex-1 md:flex-none items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
             >
               <Plus size={15} /> Новый товар
             </button>

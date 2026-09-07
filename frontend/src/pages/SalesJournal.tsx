@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { ReceiptText } from 'lucide-react'
 import { api } from '@/api/client'
 import type { Paginated, Sale } from '@/api/types'
-import { formatDateTime, formatMoney } from '@/lib/format'
+import { formatDateTime, formatMoney, todayIso } from '@/lib/format'
 import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -14,10 +14,24 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Отменена',
 }
 
+/** Дата N дней назад в формате ISO — для быстрых фильтров журнала. */
+function isoDaysAgo(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
+
 export default function SalesJournal() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const navigate = useNavigate()
+
+  const QUICK: { label: string; from: string; to: string }[] = [
+    { label: 'Сегодня', from: todayIso(), to: todayIso() },
+    { label: '7 дней', from: isoDaysAgo(6), to: todayIso() },
+    { label: '30 дней', from: isoDaysAgo(29), to: todayIso() },
+  ]
+  const hasFilter = Boolean(dateFrom || dateTo)
 
   const { data, isLoading } = useQuery({
     queryKey: ['sales', dateFrom, dateTo],
@@ -31,13 +45,47 @@ export default function SalesJournal() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-3">
         {/* На телефоне это же название уже показано в верхней полосе. */}
         <h1 className="hidden md:block text-xl font-semibold text-fg">Продажи</h1>
-        <div className="flex items-center gap-2">
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`${fieldClass} h-11 md:h-10 w-auto`} />
-          <span className="text-gray-400 text-sm">—</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`${fieldClass} h-11 md:h-10 w-auto`} />
+        <div className="w-full md:w-auto space-y-2">
+          <div className="flex items-end gap-2">
+            <div className="flex-1 md:flex-none">
+              <label className="text-xs font-medium text-fg-muted">С даты</label>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            </div>
+            <div className="flex-1 md:flex-none">
+              <label className="text-xs font-medium text-fg-muted">По дату</label>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            </div>
+          </div>
+          {/* Готовые периоды: за ними ходят чаще, чем за конкретной датой. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {QUICK.map((q) => {
+              const active = dateFrom === q.from && dateTo === q.to
+              return (
+                <button
+                  key={q.label}
+                  onClick={() => { setDateFrom(q.from); setDateTo(q.to) }}
+                  className={`h-8 rounded-lg px-2.5 text-xs font-medium transition-colors ${
+                    active
+                      ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                      : 'border border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg'
+                  }`}
+                >
+                  {q.label}
+                </button>
+              )
+            })}
+            {hasFilter && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="h-8 rounded-lg px-2.5 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+              >
+                Сбросить
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -91,7 +91,12 @@ export default function Layout() {
   const primary = items.slice(0, BOTTOM_BAR_SLOTS)
   const secondary = items.slice(BOTTOM_BAR_SLOTS)
 
-  const current = items.find((i) => (i.end ? location.pathname === i.to : location.pathname.startsWith(i.to)))
+  // Сравнение по сегментам пути: иначе «/sales» попадал в пункт «/sale»
+  // и журнал продаж подписывался словом «Продажа».
+  const current = items.find((i) =>
+    i.end ? location.pathname === i.to : location.pathname === i.to || location.pathname.startsWith(`${i.to}/`),
+  )
+  const inSecondary = current ? secondary.includes(current) : false
 
   return (
     <div className="min-h-screen flex bg-canvas">
@@ -181,9 +186,13 @@ export default function Layout() {
           ))}
           <button
             onClick={() => setMoreOpen(true)}
-            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-gray-400 dark:text-gray-500"
+            className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
+              inSecondary ? 'text-fg' : 'text-gray-400 dark:text-gray-500'
+            }`}
           >
-            <span className="flex h-7 w-12 items-center justify-center rounded-lg">
+            <span className={`flex h-7 w-12 items-center justify-center rounded-lg ${
+              inSecondary ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900' : ''
+            }`}>
               <MoreHorizontal size={18} />
             </span>
             Ещё

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Loader2, CheckCircle2, ClipboardList } from 'lucide-react'
+import { Plus, Loader2, CheckCircle2, ClipboardList } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useInventories, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
@@ -9,13 +9,14 @@ import Modal from '@/components/Modal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { InventoryDoc, ProductSearchResult, Warehouse } from '@/api/types'
-import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
+import { Card, EmptyState, LineCard, LinesTotal, QtyField, SkeletonList, SkeletonRows, fieldClass, unitLabel } from '@/components/ui'
 
 interface DraftLine {
   productId: string
   productName: string
   qtySystem: number
   qtyFact: number
+  unit?: string
 }
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведена' }
@@ -56,7 +57,7 @@ export default function InventoryDocs() {
   function addLine(p: ProductSearchResult) {
     if (lines.some((l) => l.productId === p.id)) return
     const sys = systemQtyFor(p, selectedWarehouse)
-    setLines((prev) => [...prev, { productId: p.id, productName: p.name, qtySystem: sys, qtyFact: sys }])
+    setLines((prev) => [...prev, { productId: p.id, productName: p.name, qtySystem: sys, qtyFact: sys, unit: p.unit }])
   }
 
   function updateFact(id: string, qty: number) {
@@ -66,6 +67,9 @@ export default function InventoryDocs() {
   function removeLine(id: string) {
     setLines((prev) => prev.filter((l) => l.productId !== id))
   }
+
+  /** Сколько позиций расходится с системой — это и есть смысл инвентаризации. */
+  const diffCount = lines.filter((l) => l.qtyFact !== l.qtySystem).length
 
   async function saveDraft() {
     if (!warehouseId || lines.length === 0) return
@@ -182,59 +186,81 @@ export default function InventoryDocs() {
           </>
         }
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Дата</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+        <div className="space-y-5">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-muted uppercase">Документ</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-fg-muted">Дата</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-fg-muted">Склад</label>
+                <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLines([]) }} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+                  {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Склад</label>
-              <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLines([]) }} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-          </div>
+          </section>
 
-          <div>
+          <section className="space-y-3">
+            <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Товары {lines.length > 0 && <span className="text-fg-muted/70">· {lines.length}</span>}</h4>
             <AddProductBar onSelect={addLine} label="Добавить товар для пересчёта" />
-          </div>
 
-          {lines.length > 0 && (
-            <div className="rounded-xl border border-line overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-muted text-fg-muted">
-                  <tr>
-                    <th className="text-left font-medium px-3 py-2">Товар</th>
-                    <th className="text-right font-medium px-2 py-2 w-24">По системе</th>
-                    <th className="text-right font-medium px-2 py-2 w-24">По факту</th>
-                    <th className="text-right font-medium px-2 py-2 w-20">Разница</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {lines.map((l) => {
-                    const diff = l.qtyFact - l.qtySystem
-                    return (
-                      <tr key={l.productId}>
-                        <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{l.productName}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-gray-400">{formatQty(l.qtySystem)}</td>
-                        <td className="px-2 py-2">
-                          <input type="number" value={l.qtyFact} onChange={(e) => updateFact(l.productId, parseFloat(e.target.value) || 0)} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                        </td>
-                        <td className={`px-2 py-2 text-right tabular-nums font-medium ${diff === 0 ? 'text-gray-400' : diff > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          {diff > 0 ? `+${formatQty(diff)}` : formatQty(diff)}
-                        </td>
-                        <td className="px-2 py-2">
-                          <button onClick={() => removeLine(l.productId)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          {lines.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
+              Товары не добавлены. Найдите товар выше — затем впишите, сколько штук насчитали на полке.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {lines.map((l) => {
+                const diff = l.qtyFact - l.qtySystem
+                return (
+                  <LineCard
+                    key={l.productId}
+                    title={l.productName}
+                    onRemove={() => removeLine(l.productId)}
+                    footer={
+                      <div className="flex items-center justify-between">
+                        <span className="text-fg-muted">Расхождение</span>
+                        <span
+                          className={`font-semibold tabular-nums ${
+                            diff === 0
+                              ? 'text-fg-muted'
+                              : diff > 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-red-600 dark:text-red-400'
+                          }`}
+                        >
+                          {diff === 0 ? 'нет' : diff > 0 ? `излишек +${formatQty(diff)}` : `недостача ${formatQty(diff)}`}
+                        </span>
+                      </div>
+                    }
+                  >
+                    <div>
+                      <div className="mb-1.5 text-xs font-medium text-fg-muted">Числится по системе</div>
+                      <div className="flex h-11 items-center rounded-xl border border-dashed border-line-strong px-3 text-sm font-semibold tabular-nums text-fg-muted md:h-10">
+                        {formatQty(l.qtySystem)} {unitLabel(l.unit)}
+                      </div>
+                    </div>
+                    <QtyField
+                      label="Насчитали по факту"
+                      value={l.qtyFact}
+                      unit={l.unit}
+                      onChange={(v) => updateFact(l.productId, v)}
+                    />
+                  </LineCard>
+                )
+              })}
+              <LinesTotal
+                items={[
+                  { label: 'Позиций:', value: String(lines.length) },
+                  { label: 'С расхождением:', value: String(diffCount), strong: true },
+                ]}
+              />
             </div>
           )}
+          </section>
         </div>
       </Modal>
 

@@ -50,11 +50,3 @@ export const useTheme = create<ThemeState>((set, get) => ({
   },
   toggle: () => get().setTheme(get().theme === 'dark' ? 'light' : 'dark'),
 }))
-
-/**
- * Принудительно светлая тема на время, пока смонтирован компонент (экран входа).
- * При размонтировании возвращает выбранную пользователем.
- */
-export function useForceLightTheme() {
-  applyTheme('light')
-}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Loader2, CheckCircle2, PackageMinus } from 'lucide-react'
+import { Plus, Loader2, CheckCircle2, PackageMinus } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useWarehouses, useWriteOffs } from '@/api/queries'
 import { useToast } from '@/store/toast'
@@ -8,13 +8,23 @@ import { formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
-import type { ProductSearchResult, WriteOff } from '@/api/types'
-import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
+import type { ProductSearchResult, Warehouse, WriteOff } from '@/api/types'
+import { Card, EmptyState, LineCard, LinesTotal, QtyField, SkeletonList, SkeletonRows, fieldClass, unitLabel } from '@/components/ui'
 
 interface DraftLine {
   productId: string
   productName: string
   quantity: number
+  unit?: string
+  /** Остатки по складам — чтобы не списать больше, чем есть. */
+  mainQty: number
+  shopQty: number
+}
+
+/** Сколько этого товара числится на выбранном складе. */
+function qtyAt(l: { mainQty: number; shopQty: number }, warehouse?: Warehouse) {
+  if (!warehouse) return 0
+  return warehouse.kind === 'main' ? l.mainQty : l.shopQty
 }
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведено' }
@@ -49,7 +59,10 @@ export default function WriteOffs() {
 
   function addLine(p: ProductSearchResult) {
     if (lines.some((l) => l.productId === p.id)) return
-    setLines((prev) => [...prev, { productId: p.id, productName: p.name, quantity: 1 }])
+    setLines((prev) => [
+      ...prev,
+      { productId: p.id, productName: p.name, quantity: 1, unit: p.unit, mainQty: p.main_qty, shopQty: p.shop_qty },
+    ])
   }
 
   function updateQty(id: string, qty: number) {
@@ -59,6 +72,9 @@ export default function WriteOffs() {
   function removeLine(id: string) {
     setLines((prev) => prev.filter((l) => l.productId !== id))
   }
+
+  const totalQty = lines.reduce((s, l) => s + l.quantity, 0)
+  const selectedWarehouse = warehouses?.find((w) => w.id === warehouseId)
 
   async function saveDraft() {
     if (!warehouseId || lines.length === 0) return
@@ -174,54 +190,66 @@ export default function WriteOffs() {
           </>
         }
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-5">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-muted uppercase">Документ</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-fg-muted">Дата</label>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
             </div>
             <div>
               <label className="text-xs font-medium text-fg-muted">Склад</label>
-              <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+              <select value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLines([]) }} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
                 {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </div>
           </div>
-          <div>
+          <div className="mt-3">
             <label className="text-xs font-medium text-fg-muted">Причина</label>
             <input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder="Брак, порча, потеря…" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
           </div>
+          </section>
 
-          <div>
-            <AddProductBar onSelect={addLine} />
-          </div>
+          <section className="space-y-3">
+            <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Товары {lines.length > 0 && <span className="text-fg-muted/70">· {lines.length}</span>}</h4>
+            <AddProductBar onSelect={addLine} label="Добавить товар для списания" />
 
-          {lines.length > 0 && (
-            <div className="rounded-xl border border-line overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-muted text-fg-muted">
-                  <tr>
-                    <th className="text-left font-medium px-3 py-2">Товар</th>
-                    <th className="text-right font-medium px-2 py-2 w-24">Кол-во</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {lines.map((l) => (
-                    <tr key={l.productId}>
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{l.productName}</td>
-                      <td className="px-2 py-2">
-                        <input type="number" value={l.quantity} onChange={(e) => updateQty(l.productId, parseFloat(e.target.value) || 0)} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <button onClick={() => removeLine(l.productId)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {lines.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
+              Товары не добавлены. Найдите товар выше — затем укажите, сколько штук списать.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {lines.map((l) => (
+                <LineCard
+                  key={l.productId}
+                  title={l.productName}
+                  onRemove={() => removeLine(l.productId)}
+                >
+                  <QtyField
+                    label="Сколько списать"
+                    value={l.quantity}
+                    unit={l.unit}
+                    onChange={(v) => updateQty(l.productId, v)}
+                    tone={l.quantity > qtyAt(l, selectedWarehouse) ? 'warning' : undefined}
+                    hint={
+                      l.quantity > qtyAt(l, selectedWarehouse)
+                        ? `На складе только ${formatQty(qtyAt(l, selectedWarehouse))} ${unitLabel(l.unit)}`
+                        : `Числится на складе: ${formatQty(qtyAt(l, selectedWarehouse))} ${unitLabel(l.unit)}`
+                    }
+                  />
+                </LineCard>
+              ))}
+              <LinesTotal
+                items={[
+                  { label: 'Позиций:', value: String(lines.length) },
+                  { label: 'Единиц:', value: formatQty(totalQty), strong: true },
+                ]}
+              />
             </div>
           )}
+          </section>
         </div>
       </Modal>
 

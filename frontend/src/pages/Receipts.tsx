@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Loader2, CheckCircle2, PackagePlus } from 'lucide-react'
+import { Plus, Loader2, CheckCircle2, PackagePlus } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useReceipts, useSuppliers, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
@@ -11,7 +11,7 @@ import AddProductBar from '@/components/AddProductBar'
 import ProductFormModal from '@/components/ProductFormModal'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { Product, ProductSearchResult, Receipt } from '@/api/types'
-import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
+import { Card, EmptyState, LineCard, LinesTotal, MoneyField, QtyField, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
 
 function productToSearchResult(p: Product): ProductSearchResult {
   return {
@@ -89,6 +89,10 @@ export default function Receipts() {
   }
 
   const total = lines.reduce((s, l) => s + l.quantity * l.purchasePrice, 0)
+  const totalQty = lines.reduce((s, l) => s + l.quantity, 0)
+  // Приход без количества смысла не имеет: раньше такой документ спокойно
+  // сохранялся и проводился, добавляя на склад ноль штук.
+  const canSave = Boolean(warehouseId) && lines.length > 0 && lines.every((l) => l.quantity > 0)
 
   async function saveDraft() {
     if (!warehouseId || lines.length === 0) return
@@ -214,86 +218,132 @@ export default function Receipts() {
         </table>
       </div>
 
-      <Modal open={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Новый приход" width="max-w-2xl"
+      <Modal
+        open={createOpen}
+        onClose={() => !saving && setCreateOpen(false)}
+        title="Новый приход"
+        width="max-w-2xl"
         footer={
           <>
             <button onClick={() => setCreateOpen(false)} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40">Отмена</button>
-            <button onClick={saveDraft} disabled={saving || lines.length === 0 || !warehouseId} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
+            <button onClick={saveDraft} disabled={saving || !canSave} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
               {saving && <Loader2 className="animate-spin" size={14} />} Сохранить черновик
             </button>
           </>
         }
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Дата</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+        {/* Окно разбито на два блока: сперва «шапка» документа, затем товары.
+            Раньше дата, склад, поставщик, поиск и таблица позиций шли одним
+            сплошным столбцом, и было непонятно, где заканчивается одно и
+            начинается другое. */}
+        <div className="space-y-5">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-muted uppercase">Документ</h4>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-fg-muted">Дата</span>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${fieldClass} h-11 md:h-10`} />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-medium text-fg-muted">Склад</span>
+                <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={`${fieldClass} select-field h-11 md:h-10`}>
+                  {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-medium text-fg-muted">Поставщик (необязательно)</span>
+                <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={`${fieldClass} select-field h-11 md:h-10`}>
+                  <option value="">— не указан —</option>
+                  {suppliers?.map((sup) => <option key={sup.id} value={sup.id}>{sup.name}</option>)}
+                </select>
+              </label>
             </div>
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Склад</label>
-              <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Поставщик (опционально)</label>
-            <select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-              <option value="">—</option>
-              {suppliers?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
+          </section>
 
-          <AddProductBar
-            onSelect={addLine}
-            onCreateNew={
-              permissions?.can_manage_catalog
-                ? (name) => {
-                    setNewProductName(name)
-                    setNewProductOpen(true)
-                  }
-                : undefined
-            }
-          />
+          <section>
+            <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-muted uppercase">
+              Товары {lines.length > 0 && <span className="text-fg-muted/70">· {lines.length}</span>}
+            </h4>
 
-          {lines.length > 0 && (
-            <div className="rounded-xl border border-line overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-muted text-fg-muted">
-                  <tr>
-                    <th className="text-left font-medium px-3 py-2">Товар</th>
-                    <th className="text-right font-medium px-2 py-2 w-20">Кол-во</th>
-                    <th className="text-right font-medium px-2 py-2 w-28">Закупка</th>
-                    <th className="text-right font-medium px-2 py-2 w-28">Новая цена</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {lines.map((l) => (
-                    <tr key={l.product.id}>
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{l.product.name}</td>
-                      <td className="px-2 py-2">
-                        <input type="number" value={l.quantity} onChange={(e) => updateLine(l.product.id, { quantity: parseFloat(e.target.value) || 0 })} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input type="number" value={l.purchasePrice} onChange={(e) => updateLine(l.product.id, { purchasePrice: parseFloat(e.target.value) || 0 })} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <input type="number" value={l.salePrice} placeholder="—" onChange={(e) => updateLine(l.product.id, { salePrice: e.target.value === '' ? '' : parseFloat(e.target.value) })} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <button onClick={() => removeLine(l.product.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex justify-end px-3 py-2 bg-surface-muted text-sm font-semibold">
-                Итого: {formatMoney(total)}
+            <AddProductBar
+              onSelect={addLine}
+              onCreateNew={
+                permissions?.can_manage_catalog
+                  ? (name) => {
+                      setNewProductName(name)
+                      setNewProductOpen(true)
+                    }
+                  : undefined
+              }
+            />
+
+            {lines.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
+                Товары не добавлены. Найдите товар выше — затем укажите, сколько штук пришло.
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="mt-3 space-y-2">
+                {lines.map((l) => {
+                  const lineSum = l.quantity * l.purchasePrice
+                  return (
+                    <LineCard
+                      key={l.product.id}
+                      title={l.product.name}
+                      subtitle={l.product.sku}
+                      onRemove={() => removeLine(l.product.id)}
+                      footer={
+                        <div className="flex items-center justify-between">
+                          <span className="text-fg-muted">Сумма по позиции</span>
+                          <span className="font-semibold tabular-nums text-fg">{formatMoney(lineSum)}</span>
+                        </div>
+                      }
+                    >
+                      <QtyField
+                        label="Сколько пришло"
+                        value={l.quantity}
+                        unit={l.product.unit}
+                        onChange={(v) => updateLine(l.product.id, { quantity: v })}
+                      />
+                      <MoneyField
+                        label="Закупочная цена за единицу"
+                        value={l.purchasePrice || ''}
+                        placeholder="0"
+                        tone={l.purchasePrice <= 0 ? 'warning' : undefined}
+                        onChange={(v) => updateLine(l.product.id, { purchasePrice: v === '' ? 0 : v })}
+                        hint={
+                          l.purchasePrice <= 0
+                            ? 'Укажите закупку — из неё считается себестоимость и прибыль'
+                            : undefined
+                        }
+                      />
+                      <div className="sm:col-span-2">
+                        <MoneyField
+                          label="Новая цена продажи (необязательно)"
+                          value={l.salePrice}
+                          placeholder={`сейчас ${formatMoney(l.product.sale_price)}`}
+                          onChange={(v) => updateLine(l.product.id, { salePrice: v })}
+                          hint="Оставьте пустым — цена товара не изменится"
+                        />
+                      </div>
+                    </LineCard>
+                  )
+                })}
+
+                <LinesTotal
+                  items={[
+                    { label: 'Позиций:', value: String(lines.length) },
+                    { label: 'Единиц:', value: formatQty(totalQty) },
+                    { label: 'Итого:', value: formatMoney(total), strong: true },
+                  ]}
+                />
+              </div>
+            )}
+          </section>
+
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-medium text-fg-muted">Комментарий (необязательно)</span>
+            <input value={comment} onChange={(e) => setComment(e.target.value)} className={`${fieldClass} h-11 md:h-10`} placeholder="Например: накладная №123" />
+          </label>
         </div>
       </Modal>
 

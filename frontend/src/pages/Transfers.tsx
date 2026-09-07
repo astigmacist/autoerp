@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Loader2, CheckCircle2, Sparkles, ArrowLeftRight } from 'lucide-react'
+import { Plus, Loader2, CheckCircle2, Sparkles, ArrowLeftRight } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useTransfers, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
@@ -8,13 +8,24 @@ import { formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
-import type { ProductSearchResult, Transfer, TransferSuggestion } from '@/api/types'
-import { Card, EmptyState, SkeletonList, SkeletonRows, fieldClass } from '@/components/ui'
+import type { ProductSearchResult, Transfer, TransferSuggestion, Warehouse } from '@/api/types'
+import { Card, EmptyState, LineCard, LinesTotal, QtyField, SkeletonList, SkeletonRows, fieldClass, unitLabel } from '@/components/ui'
 
 interface DraftLine {
   productId: string
   productName: string
   quantity: number
+  /** Единица измерения — чтобы рядом с числом было видно «шт», «л», «кг». */
+  unit?: string
+  /** Остатки по складам — чтобы прямо в строке было видно, сколько можно взять. */
+  mainQty: number
+  shopQty: number
+}
+
+/** Сколько этого товара лежит на складе-источнике. */
+function qtyAt(l: { mainQty: number; shopQty: number }, warehouse?: Warehouse) {
+  if (!warehouse) return 0
+  return warehouse.kind === 'main' ? l.mainQty : l.shopQty
 }
 
 const STATUS_LABELS: Record<string, string> = { draft: 'Черновик', posted: 'Проведён', cancelled: 'Отменён' }
@@ -56,7 +67,10 @@ export default function Transfers() {
 
   function addLine(p: ProductSearchResult) {
     if (lines.some((l) => l.productId === p.id)) return
-    setLines((prev) => [...prev, { productId: p.id, productName: p.name, quantity: 1 }])
+    setLines((prev) => [
+      ...prev,
+      { productId: p.id, productName: p.name, quantity: 1, unit: p.unit, mainQty: p.main_qty, shopQty: p.shop_qty },
+    ])
   }
 
   function updateQty(id: string, qty: number) {
@@ -67,6 +81,9 @@ export default function Transfers() {
     setLines((prev) => prev.filter((l) => l.productId !== id))
   }
 
+  const totalQty = lines.reduce((s, l) => s + l.quantity, 0)
+  const fromWarehouse = warehouses?.find((w) => w.id === fromId)
+
   async function fillDeficit() {
     setSuggesting(true)
     try {
@@ -75,7 +92,15 @@ export default function Transfers() {
         push('Дефицита не найдено — витрина укомплектована', 'info')
         return
       }
-      setLines(data.map((s) => ({ productId: s.product_id, productName: s.product_name, quantity: s.suggested_qty })))
+      setLines(
+        data.map((s) => ({
+          productId: s.product_id,
+          productName: s.product_name,
+          quantity: s.suggested_qty,
+          mainQty: s.main_qty,
+          shopQty: s.shop_qty,
+        })),
+      )
       push(`Подобрано ${data.length} позиций для пополнения дефицита`, 'success')
     } catch (err) {
       push(getApiError(err).detail, 'error')
@@ -205,65 +230,76 @@ export default function Transfers() {
           </>
         }
       >
-        <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Дата</label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+        <div className="space-y-5">
+          <section>
+            <h4 className="mb-2 text-xs font-semibold tracking-wide text-fg-muted uppercase">Документ</h4>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="text-xs font-medium text-fg-muted">Дата</label>
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-fg-muted">Откуда</label>
+                <select value={fromId} onChange={(e) => { setFromId(e.target.value); setLines([]) }} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+                  {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-fg-muted">Куда</label>
+                <select value={toId} onChange={(e) => setToId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+                  {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Откуда</label>
-              <select value={fromId} onChange={(e) => setFromId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-fg-muted">Куда</label>
-              <select value={toId} onChange={(e) => setToId(e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-          </div>
+          </section>
 
-          <button
-            onClick={fillDeficit}
-            disabled={suggesting}
-            className="flex items-center gap-1.5 rounded-xl border border-dashed border-line-strong text-gray-600 dark:text-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
-          >
-            {suggesting ? <Loader2 className="animate-spin" size={15} /> : <Sparkles size={15} />}
-            Пополнить дефицит автоматически
-          </button>
-
-          <div>
+          <section className="space-y-3">
+            <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Товары {lines.length > 0 && <span className="text-fg-muted/70">· {lines.length}</span>}</h4>
             <AddProductBar onSelect={addLine} label="Добавить товар вручную" />
-          </div>
+            <button
+              onClick={fillDeficit}
+              disabled={suggesting}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-dashed border-line-strong px-3 text-sm font-medium text-fg-muted transition-transform hover:bg-surface-muted hover:text-fg active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
+            >
+              {suggesting ? <Loader2 className="animate-spin" size={15} /> : <Sparkles size={15} />}
+              Пополнить дефицит автоматически
+            </button>
 
-          {lines.length > 0 && (
-            <div className="rounded-xl border border-line overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-muted text-fg-muted">
-                  <tr>
-                    <th className="text-left font-medium px-3 py-2">Товар</th>
-                    <th className="text-right font-medium px-2 py-2 w-24">Кол-во</th>
-                    <th className="w-8" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {lines.map((l) => (
-                    <tr key={l.productId}>
-                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{l.productName}</td>
-                      <td className="px-2 py-2">
-                        <input type="number" value={l.quantity} onChange={(e) => updateQty(l.productId, parseFloat(e.target.value) || 0)} className="w-full text-right bg-transparent outline-none tabular-nums" />
-                      </td>
-                      <td className="px-2 py-2">
-                        <button onClick={() => removeLine(l.productId)} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {lines.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center text-sm text-fg-muted">
+              Товары не добавлены. Найдите товар выше — затем укажите, сколько штук переместить.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {lines.map((l) => (
+                <LineCard
+                  key={l.productId}
+                  title={l.productName}
+                  onRemove={() => removeLine(l.productId)}
+                >
+                  <QtyField
+                    label="Сколько переместить"
+                    value={l.quantity}
+                    unit={l.unit}
+                    onChange={(v) => updateQty(l.productId, v)}
+                    tone={l.quantity > qtyAt(l, fromWarehouse) ? 'warning' : undefined}
+                    hint={
+                      l.quantity > qtyAt(l, fromWarehouse)
+                        ? `На складе «${fromWarehouse?.name ?? '—'}» только ${formatQty(qtyAt(l, fromWarehouse))} ${unitLabel(l.unit)}`
+                        : `Доступно: ${formatQty(qtyAt(l, fromWarehouse))} ${unitLabel(l.unit)}`
+                    }
+                  />
+                </LineCard>
+              ))}
+              <LinesTotal
+                items={[
+                  { label: 'Позиций:', value: String(lines.length) },
+                  { label: 'Единиц:', value: formatQty(totalQty), strong: true },
+                ]}
+              />
             </div>
           )}
+          </section>
         </div>
       </Modal>
 

@@ -6,7 +6,7 @@ import { useBrands, useCategories } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import Modal from '@/components/Modal'
 import type { Product } from '@/api/types'
-import { fieldClass } from '@/components/ui'
+import { MoneyField, fieldClass } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -116,7 +116,7 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
   }
 
   const isEdit = !!product
-  const canSave = form.name.trim().length > 0 && (isEdit || form.sku.trim().length > 0 || true)
+  const canSave = form.name.trim().length > 0
 
   async function handleSubmit() {
     if (!form.name.trim()) return
@@ -182,125 +182,159 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
         </>
       }
     >
-      <div className="space-y-3">
-        <div>
-          <label className="text-xs font-medium text-fg-muted">Название *</label>
-          <input value={form.name} onChange={(e) => set('name', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="Фильтр масляный Toyota Camry 2.5" />
-        </div>
+      <div className="space-y-5">
+        <section className="space-y-3">
+          <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Что за товар</h4>
+          <div>
+            <label className="text-xs font-medium text-fg-muted">Название *</label>
+            <input value={form.name} onChange={(e) => set('name', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="Фильтр масляный Toyota Camry 2.5" />
+          </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Код (SKU) {isEdit && '— нельзя изменить'}</label>
-            <input
-              value={form.sku}
-              disabled={isEdit}
-              onChange={(e) => set('sku', e.target.value)}
-              placeholder="автоматически, если пусто"
-              className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none disabled:opacity-50"
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-fg-muted">Код (SKU)</label>
+              <input
+                value={form.sku}
+                disabled={isEdit}
+                onChange={(e) => set('sku', e.target.value)}
+                placeholder="создастся автоматически"
+                className={`mt-1 ${fieldClass} h-11 md:h-10 disabled:opacity-50`}
+              />
+              {isEdit && <div className="mt-1 text-xs text-fg-muted">Код менять нельзя — по нему товар уже в документах</div>}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-fg-muted">OEM-код</label>
+              <input value={form.oem_code} onChange={(e) => set('oem_code', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="90915-YZZD4" />
+            </div>
           </div>
-          <div>
-            <label className="text-xs font-medium text-fg-muted">OEM-код</label>
-            <input value={form.oem_code} onChange={(e) => set('oem_code', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} placeholder="90915-YZZD4" />
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-gray-500 flex items-center justify-between">
-              Бренд
-              <button type="button" onClick={() => setAddingBrand((v) => !v)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5">
-                <Plus size={12} /> новый
-              </button>
-            </label>
-            {addingBrand ? (
-              <div className="flex gap-1 mt-1">
-                <input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Название бренда" className="flex-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none" />
-                <button type="button" onClick={createBrand} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white px-3">OK</button>
-              </div>
-            ) : (
-              <select value={form.brand} onChange={(e) => set('brand', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                <option value="">—</option>
-                {brands?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-            )}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-fg-muted flex items-center justify-between">
+                Бренд
+                <button type="button" onClick={() => setAddingBrand((v) => !v)} className="flex items-center gap-0.5 text-fg-muted hover:text-fg">
+                  <Plus size={12} /> новый
+                </button>
+              </label>
+              {addingBrand ? (
+                <div className="flex gap-1 mt-1">
+                  <input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} placeholder="Название бренда" className={`flex-1 ${fieldClass} h-11 md:h-10`} />
+                  <button type="button" onClick={createBrand} className="inline-flex h-11 md:h-10 shrink-0 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">OK</button>
+                </div>
+              ) : (
+                <select value={form.brand} onChange={(e) => set('brand', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+                  <option value="">— не указан —</option>
+                  {brands?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-fg-muted flex items-center justify-between">
+                Категория
+                <button type="button" onClick={() => setAddingCategory((v) => !v)} className="flex items-center gap-0.5 text-fg-muted hover:text-fg">
+                  <Plus size={12} /> новая
+                </button>
+              </label>
+              {addingCategory ? (
+                <div className="flex gap-1 mt-1">
+                  <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className={`flex-1 ${fieldClass} h-11 md:h-10`} />
+                  <button type="button" onClick={createCategory} className="inline-flex h-11 md:h-10 shrink-0 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">OK</button>
+                </div>
+              ) : (
+                <select value={form.category} onChange={(e) => set('category', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
+                  <option value="">— не указана —</option>
+                  {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 flex items-center justify-between">
-              Категория
-              <button type="button" onClick={() => setAddingCategory((v) => !v)} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5">
-                <Plus size={12} /> новая
-              </button>
-            </label>
-            {addingCategory ? (
-              <div className="flex gap-1 mt-1">
-                <input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none" />
-                <button type="button" onClick={createCategory} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white px-3">OK</button>
-              </div>
-            ) : (
-              <select value={form.category} onChange={(e) => set('category', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
-                <option value="">—</option>
-                {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            )}
-          </div>
-        </div>
 
-        <div className="grid grid-cols-4 gap-3">
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Ед. изм.</label>
+          <div className="sm:w-1/2 sm:pr-1.5">
+            <label className="text-xs font-medium text-fg-muted">Единица измерения</label>
             <select value={form.unit} onChange={(e) => set('unit', e.target.value)} className={`mt-1 ${fieldClass} select-field h-11 md:h-10`}>
               {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </select>
           </div>
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Розничная цена</label>
-            <input type="number" value={form.sale_price} onChange={(e) => set('sale_price', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Мин. цена продажи</label>
-            <input type="number" value={form.min_price} onChange={(e) => set('min_price', e.target.value)} placeholder="= себестоимость" className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Порог дефицита</label>
-            <input type="number" value={form.min_stock} onChange={(e) => set('min_stock', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
-          </div>
-        </div>
+        </section>
 
-        {!isEdit && (
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Ориентировочная закупочная цена (опционально — точная цена задаётся приходом)</label>
-            <input type="number" value={form.purchase_price} onChange={(e) => set('purchase_price', e.target.value)} className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm outline-none tabular-nums" />
+        <section className="space-y-3">
+          <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Цены</h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <MoneyField
+              label="Цена продажи"
+              value={form.sale_price === '' ? '' : Number(form.sale_price)}
+              onChange={(v) => set('sale_price', v === '' ? '' : String(v))}
+              placeholder="0"
+              tone={form.sale_price === '' || Number(form.sale_price) <= 0 ? 'warning' : undefined}
+              hint={
+                form.sale_price === '' || Number(form.sale_price) <= 0
+                  ? 'По этой цене товар пробивается на кассе'
+                  : undefined
+              }
+            />
+            <MoneyField
+              label="Минимальная цена продажи"
+              value={form.min_price === '' ? '' : Number(form.min_price)}
+              onChange={(v) => set('min_price', v === '' ? '' : String(v))}
+              placeholder="= себестоимость"
+              hint="Ниже неё скидку на кассе придётся согласовывать"
+            />
           </div>
-        )}
+          {!isEdit && (
+            <div className="sm:w-1/2 sm:pr-1.5">
+              <MoneyField
+                label="Закупочная цена"
+                value={form.purchase_price === '' ? '' : Number(form.purchase_price)}
+                onChange={(v) => set('purchase_price', v === '' ? '' : String(v))}
+                placeholder="0"
+                hint="Ориентировочно — точная себестоимость посчитается при приходе"
+              />
+            </div>
+          )}
+        </section>
 
-        <div>
-          <label className="text-xs font-medium text-fg-muted">Применимость к авто</label>
-          <input value={form.applicability} onChange={(e) => set('applicability', e.target.value)} placeholder="Toyota Camry 40/50, Lexus ES 2006–2012" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-medium text-fg-muted">Место на складе</label>
-            <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Стеллаж B, полка 3" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+        <section className="space-y-3">
+          <h4 className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Склад и поиск</h4>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-fg-muted">Порог дефицита</label>
+              <input
+                inputMode="numeric"
+                value={form.min_stock}
+                onChange={(e) => set('min_stock', e.target.value)}
+                className={`mt-1 ${fieldClass} h-11 md:h-10 tabular-nums`}
+              />
+              <div className="mt-1 text-xs text-fg-muted">Меньше этого остатка — товар подсветится как дефицит</div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-fg-muted">Место на складе</label>
+              <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="Стеллаж B, полка 3" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            </div>
           </div>
+
           <div>
-            <label className="text-xs font-medium text-fg-muted">Штрихкод</label>
-            <input value={form.barcode} onChange={(e) => set('barcode', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            <label className="text-xs font-medium text-fg-muted">Применимость к авто</label>
+            <input value={form.applicability} onChange={(e) => set('applicability', e.target.value)} placeholder="Toyota Camry 40/50, Lexus ES 2006–2012" className={`mt-1 ${fieldClass} h-11 md:h-10`} />
           </div>
-        </div>
 
-        <div>
-          <label className="text-xs font-medium text-fg-muted">Комментарий</label>
-          <input value={form.note} onChange={(e) => set('note', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
-        </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-fg-muted">Штрихкод</label>
+              <input value={form.barcode} onChange={(e) => set('barcode', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-fg-muted">Комментарий</label>
+              <input value={form.note} onChange={(e) => set('note', e.target.value)} className={`mt-1 ${fieldClass} h-11 md:h-10`} />
+            </div>
+          </div>
 
-        {isEdit && (
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-            Активен (показывать в поиске и продаже)
-          </label>
-        )}
+          {isEdit && (
+            <label className="flex items-center gap-2 text-sm text-fg-muted">
+              <input type="checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} className="h-4 w-4 accent-gray-900 dark:accent-gray-100" />
+              Активен — показывать в поиске и на кассе
+            </label>
+          )}
+        </section>
       </div>
     </Modal>
   )
