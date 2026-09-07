@@ -10,7 +10,7 @@ import {
 import clsx from 'clsx'
 import { useDashboard } from '@/api/queries'
 import { useAuth } from '@/store/auth'
-import { formatMoney, formatDateTime } from '@/lib/format'
+import { formatDate, formatDateTime, formatMoney } from '@/lib/format'
 import { Card, CardTitle, EmptyState, Skeleton } from '@/components/ui'
 
 const PERIODS: { key: 'today' | '7d' | '30d'; label: string }[] = [
@@ -26,9 +26,48 @@ const PAYMENT_LABELS: Record<string, string> = {
   transfer: 'Перевод',
 }
 
-// Цвета читаются и на белой карточке, и на тёмной. Почти чёрный, который был
-// здесь раньше, в тёмной теме полностью сливался с фоном карточки.
-const PAYMENT_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899']
+/**
+ * Цвет закреплён за способом оплаты, а не за его местом в данных. Раньше цвет
+ * брался по индексу: в день, когда платили только картой, карта была синей, а
+ * назавтра синими становились наличные — легенду приходилось перечитывать.
+ * Сами оттенки живут в index.css и меняются вместе с темой.
+ */
+const PAYMENT_COLORS: Record<string, string> = {
+  cash: 'var(--chart-1)',
+  kaspi_qr: 'var(--chart-2)',
+  card: 'var(--chart-3)',
+  transfer: 'var(--chart-4)',
+}
+const paymentColor = (method: string) => PAYMENT_COLORS[method] ?? 'var(--chart-1)'
+
+/** Подпись оси: 45 000 вместо 45000 — как во всех остальных числах. */
+const axisNumber = (v: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(v)
+
+/** Подпись дня: 04.09 вместо 2026-09-04 — на оси год всё равно один. */
+function axisDay(value: string): string {
+  const [, month, day] = value.split('-')
+  return month && day ? `${day}.${month}` : value
+}
+
+/** Подсказка графика: дата и сумма. Стандартная выводит «Выручка : 16 200 ₸» —
+ *  с пробелом перед двоеточием и с названием ряда, которое и так в заголовке. */
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null
+  const point = payload[0]
+  return (
+    <div
+      className="rounded-xl border px-3 py-2 shadow-pop"
+      style={{
+        background: 'var(--chart-tooltip-bg)',
+        borderColor: 'var(--chart-tooltip-border)',
+        color: 'var(--chart-tooltip-fg)',
+      }}
+    >
+      <div className="text-xs opacity-70">{label ? formatDate(String(label)) : point.name}</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums">{formatMoney(point.value)}</div>
+    </div>
+  )
+}
 
 function TrendChip({ value }: { value: number }) {
   const up = value >= 0
@@ -184,31 +223,55 @@ export default function Dashboard() {
                   title="Пока нечего показать"
                   hint="График появится, как только пройдёт первая продажа за выбранный период."
                 />
+              ) : data.period_revenue_by_day.length < 2 ? (
+                /* Одна точка — это не график, а число, и оно уже есть в плитке
+                   «Выручка». Вместо одинокой точки посреди пустого поля —
+                   переход к периоду, на котором видно динамику. */
+                <EmptyState
+                  icon={<BarChart3 size={20} />}
+                  title={period === 'today' ? 'За один день динамики не видно' : 'Продажи были только в один день'}
+                  hint={
+                    period === 'today'
+                      ? 'Выручка за сегодня — в плитке наверху. Динамика появляется на периоде от недели.'
+                      : 'Как только продажи пройдут в разные дни, здесь появится график.'
+                  }
+                  action={
+                    period === 'today' ? (
+                      <button
+                        onClick={() => setPeriod('7d')}
+                        className="inline-flex h-10 items-center justify-center rounded-xl border border-line-strong px-4 text-sm font-semibold text-fg transition-transform hover:bg-surface-muted active:scale-[0.98]"
+                      >
+                        Показать 7 дней
+                      </button>
+                    ) : undefined
+                  }
+                />
               ) : (
                 <ResponsiveContainer width="100%" height={240}>
                   <AreaChart data={data.period_revenue_by_day}>
                     <defs>
                       <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.28} />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+                        <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={40} />
-                    <Tooltip
-                      formatter={(v: any) => formatMoney(v)}
-                      cursor={{ stroke: '#9ca3af', strokeDasharray: 4 }}
-                      contentStyle={{
-                        background: 'var(--chart-tooltip-bg)',
-                        border: '1px solid var(--chart-tooltip-border)',
-                        borderRadius: 12,
-                        fontSize: 13,
-                        boxShadow: '0 12px 32px rgb(16 17 29 / 0.12)',
-                      }}
-                      labelStyle={{ color: 'var(--chart-tooltip-fg)' }}
-                      itemStyle={{ color: 'var(--chart-tooltip-fg)' }}
+                    <XAxis
+                      dataKey="day"
+                      tickFormatter={axisDay}
+                      tick={{ fontSize: 12, fill: 'var(--chart-axis)' }}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={24}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#rev)" strokeWidth={2.5} />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: 'var(--chart-axis)' }}
+                      tickFormatter={axisNumber}
+                      axisLine={false}
+                      tickLine={false}
+                      width={64}
+                    />
+                    <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--chart-axis)' }} />
+                    <Area type="monotone" dataKey="revenue" stroke="var(--chart-1)" fill="url(#rev)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -220,6 +283,9 @@ export default function Dashboard() {
                 <EmptyState icon={<CreditCard size={20} />} title="Оплат пока не было" />
               ) : (
                 <>
+                  {/* Кольцо из одного сегмента ничего не сравнивает — при одном
+                      способе оплаты остаётся только строка со суммой. */}
+                  {data.payments_breakdown.length > 1 && (
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart>
                       <Pie
@@ -231,31 +297,21 @@ export default function Dashboard() {
                         paddingAngle={2}
                         stroke="none"
                       >
-                        {data.payments_breakdown.map((_, i) => (
-                          <Cell key={i} fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
+                        {data.payments_breakdown.map((p) => (
+                          <Cell key={p.method} fill={paymentColor(p.method)} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        formatter={(v: any) => formatMoney(v)}
-                        contentStyle={{
-                          background: 'var(--chart-tooltip-bg)',
-                          border: '1px solid var(--chart-tooltip-border)',
-                          borderRadius: 12,
-                          fontSize: 13,
-                          boxShadow: '0 12px 32px rgb(16 17 29 / 0.12)',
-                        }}
-                        labelStyle={{ color: 'var(--chart-tooltip-fg)' }}
-                        itemStyle={{ color: 'var(--chart-tooltip-fg)' }}
-                      />
+                      <Tooltip content={<ChartTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
+                  )}
                   <div className="mt-3 space-y-2">
-                    {data.payments_breakdown.map((p, i) => (
+                    {data.payments_breakdown.map((p) => (
                       <div key={p.method} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2 text-fg-muted">
                           <span
                             className="h-2.5 w-2.5 rounded-full"
-                            style={{ background: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }}
+                            style={{ background: paymentColor(p.method) }}
                           />
                           {PAYMENT_LABELS[p.method] ?? p.method}
                         </span>
@@ -291,7 +347,7 @@ export default function Dashboard() {
                           {i + 1}
                         </span>
                         <span className="block min-w-0 flex-1">
-                          <span className="block truncate text-fg">{p.product__name}</span>
+                          <span className="line-clamp-2 block text-fg">{p.product__name}</span>
                           <span className="block truncate text-xs text-fg-muted">{p.product__sku} · {p.qty} шт</span>
                         </span>
                       </span>

@@ -99,14 +99,14 @@ export default function Products() {
                     <button
                       onClick={() => openEdit(p)}
                       aria-label="Редактировать"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
                     >
                       <Pencil size={15} />
                     </button>
                     <button
                       onClick={() => toggleActive(p)}
                       aria-label={p.is_active ? 'В архив' : 'Восстановить'}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
                     >
                       {p.is_active ? <Archive size={15} /> : <ArchiveRestore size={15} />}
                     </button>

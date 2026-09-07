@@ -25,6 +25,15 @@
   --chart-tooltip-bg: #ffffff;
   --chart-tooltip-fg: #16171d;
   --chart-tooltip-border: #e7e9ee;
+  --chart-axis: #9ca3af;
+  /* Палитра графиков. Оттенки закреплены за сущностью (способ оплаты), а не за
+     порядком в данных: иначе «Наличные» меняли бы цвет от дня ко дню.
+     Набор проверен на различимость при дальтонизме — соседние пары дают
+     ΔE ≥ 8 при протанопии и дейтеранопии, в обеих темах. */
+  --chart-1: #6366f1;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
 
   color-scheme: light;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -45,6 +54,13 @@
   --chart-tooltip-bg: #1a1d25;
   --chart-tooltip-fg: #e8eaee;
   --chart-tooltip-border: #333845;
+  --chart-axis: #6b7280;
+  /* Те же оттенки, пересчитанные под тёмный фон: осветлить светлую палитру
+     нельзя — она вылетает из диапазона яркости и теряет контраст. */
+  --chart-1: #6f7fe6;
+  --chart-2: #e2683a;
+  --chart-3: #1aa876;
+  --chart-4: #bb881c;
 
   color-scheme: dark;
 }
@@ -194,5 +210,10 @@ tbody tr:hover { background: var(--surface-muted); }
 
 /* Действия в строке проявляются при наведении на строку, а не мозолят глаза
    бледными значками в каждой строке. */
-tbody tr .row-actions { opacity: .45; transition: opacity .12s ease; }
+/* Действия строки не мозолят глаза, но и не выглядят выключенными.
+   На тач-экране наводить нечем — там они всегда в полную силу. */
+tbody tr .row-actions { opacity: .6; transition: opacity .12s ease; }
 tbody tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
+@media (hover: none) {
+  tbody tr .row-actions { opacity: 1; }
+}

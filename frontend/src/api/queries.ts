@@ -21,12 +21,18 @@ export function useProducts(params: { search?: string; page?: number } = {}) {
   })
 }
 
+/**
+ * Товары для кассы. Пустой запрос — это витрина: сервер отдаёт то, что есть
+ * в зале, чтобы продавцу было что нажать, не набирая название.
+ */
 export function useProductSearch(q: string) {
+  const query = q.trim()
   return useQuery({
-    queryKey: ['product-search', q],
-    queryFn: async () => (await api.get<ProductSearchResult[]>('/products/search/', { params: { q } })).data,
-    enabled: q.trim().length >= 2,
+    queryKey: ['product-search', query],
+    queryFn: async () => (await api.get<ProductSearchResult[]>('/products/search/', { params: { q: query } })).data,
+    enabled: query.length !== 1,
     staleTime: 10_000,
+    placeholderData: (prev) => prev,
   })
 }
 

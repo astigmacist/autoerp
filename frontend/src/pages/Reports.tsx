@@ -100,38 +100,72 @@ export default function Reports() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-line bg-surface overflow-x-auto">
-            <div className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 border-b border-line">
+          <div className="rounded-2xl border border-line bg-surface">
+            <div className="border-b border-line px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
               Проданные товары
             </div>
-            <table className="w-full text-sm min-w-[600px]">
-              <thead className="text-fg-muted">
-                <tr>
-                  <th className="text-left font-medium px-4 py-2">Товар</th>
-                  <th className="text-right font-medium px-2 py-2">Кол-во</th>
-                  <th className="text-right font-medium px-2 py-2">По прайсу</th>
-                  <th className="text-right font-medium px-2 py-2">Факт</th>
-                  <th className="text-right font-medium px-4 py-2">Скидка</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {data.items.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Продаж не было</td></tr>}
-                {data.items.map((i) => (
-                  <tr key={i.product__sku}>
-                    <td className="px-4 py-2">
-                      <div className="text-fg">{i.product__name}</div>
-                      <div className="text-xs text-gray-400">{i.product__sku}</div>
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatQty(i.qty)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatMoney(i.amount_base)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums font-medium">{formatMoney(i.amount_fact)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-amber-600">
-                      {i.discount > 0 ? `−${formatMoney(i.discount)}` : '—'}
-                    </td>
+
+            {data.items.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm text-fg-muted">Продаж не было</div>
+            )}
+
+            {/* На телефоне таблица из пяти колонок уезжает вбок — там карточки. */}
+            <div className="divide-y divide-line md:hidden">
+              {data.items.map((i) => (
+                <div key={i.product__sku} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm leading-snug text-fg">{i.product__name}</div>
+                      <div className="text-xs text-fg-muted">{i.product__sku}</div>
+                    </div>
+                    <div className="shrink-0 text-right text-sm font-semibold tabular-nums text-fg">
+                      {formatMoney(i.amount_fact)}
+                    </div>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-fg-muted">
+                    <span className="tabular-nums">{formatQty(i.qty)} шт</span>
+                    {i.discount > 0 && (
+                      <>
+                        <span className="tabular-nums line-through">{formatMoney(i.amount_base)}</span>
+                        <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                          −{formatMoney(i.discount)}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="text-fg-muted">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Товар</th>
+                    <th className="px-2 py-2 text-right font-medium">Кол-во</th>
+                    <th className="px-2 py-2 text-right font-medium">По прайсу</th>
+                    <th className="px-2 py-2 text-right font-medium">Факт</th>
+                    <th className="px-4 py-2 text-right font-medium">Скидка</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {data.items.map((i) => (
+                    <tr key={i.product__sku}>
+                      <td className="px-4 py-2">
+                        <div className="text-fg">{i.product__name}</div>
+                        <div className="text-xs text-fg-muted">{i.product__sku}</div>
+                      </td>
+                      <td className="px-2 py-2 text-right tabular-nums">{formatQty(i.qty)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{formatMoney(i.amount_base)}</td>
+                      <td className="px-2 py-2 text-right font-medium tabular-nums">{formatMoney(i.amount_fact)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-amber-600 dark:text-amber-400">
+                        {i.discount > 0 ? `−${formatMoney(i.discount)}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {data.sellers.length > 1 && (

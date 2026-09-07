@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Percent } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import clsx from 'clsx'
+import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Percent, X, ShoppingCart } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
-import { useProductSearch, useWarehouses } from '@/api/queries'
+import { useCurrentShift, useProductSearch, useWarehouses } from '@/api/queries'
 import { useAuth } from '@/store/auth'
 import { useToast } from '@/store/toast'
 import { formatMoney, formatQty } from '@/lib/format'
 import Modal from '@/components/Modal'
 import ShiftBar from '@/components/ShiftBar'
 import type { PaymentMethod, ProductSearchResult, Sale } from '@/api/types'
-import { fieldClass } from '@/components/ui'
+import { SkeletonList, fieldClass } from '@/components/ui'
 
 interface CartLine {
   product: ProductSearchResult
@@ -35,11 +37,84 @@ function discountPercent(base: number, price: number): number {
   return ((base - price) / base) * 100
 }
 
+/**
+ * Есть ли физическая клавиатура. На телефоне автофокус в поиск выбрасывает
+ * экранную клавиатуру на пол-экрана ещё до того, как продавец решил что-то
+ * искать, — и первое, что он видит вместо товаров, это клавиши.
+ */
+function hasHardwareKeyboard(): boolean {
+  try {
+    return window.matchMedia('(pointer: fine)').matches
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Сколько покупатель мог дать наличными: сама сумма (без сдачи), округления
+ * вверх и ближайшая крупная купюра. Быстрее, чем набирать число руками.
+ */
+function cashSuggestions(total: number): number[] {
+  if (total <= 0) return []
+  const values = new Set<number>([Math.ceil(total)])
+  for (const step of [500, 1000, 5000]) {
+    const up = Math.ceil(total / step) * step
+    if (up > total) values.add(up)
+  }
+  for (const bill of [1000, 2000, 5000, 10000, 20000]) {
+    if (bill > total) {
+      values.add(bill)
+      break
+    }
+  }
+  return [...values].sort((a, b) => a - b).slice(0, 4)
+}
+
+/**
+ * Цена продажи в строке чека. Обычный `<input type=number>` показывал «12000»
+ * рядом с «12 000 ₸» в остальном интерфейсе — на такое число смотришь дважды.
+ * Пока поле не в фокусе, число с разрядами; при вводе — как набирают.
+ */
+function PriceInput({
+  value, onChange, highlighted,
+}: {
+  value: number
+  onChange: (value: number) => void
+  highlighted: boolean
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = draft ?? new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(value)
+  return (
+    <div className="relative min-w-0 flex-1">
+      <input
+        inputMode="numeric"
+        value={shown}
+        aria-label="Цена продажи"
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => {
+          setDraft(e.target.value)
+          onChange(parseFloat(e.target.value.replace(/\s/g, '')) || 0)
+        }}
+        onBlur={() => setDraft(null)}
+        className={clsx(
+          'h-9 w-full rounded-lg border bg-transparent pr-6 pl-2.5 text-right text-sm font-semibold tabular-nums outline-none',
+          highlighted
+            ? 'border-amber-300 text-amber-600 dark:border-amber-800 dark:text-amber-400'
+            : 'border-line-strong text-fg',
+        )}
+      />
+      <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-fg-muted">₸</span>
+    </div>
+  )
+}
+
 export default function SalePage() {
   const { data: warehouses } = useWarehouses()
+  const { data: shift } = useCurrentShift()
   const shop = useMemo(() => warehouses?.find((w) => w.is_sellable), [warehouses])
   const { permissions } = useAuth()
   const { push } = useToast()
+  const qc = useQueryClient()
 
   const [query, setQuery] = useState('')
   const { data: results, isFetching } = useProductSearch(query)
@@ -53,16 +128,28 @@ export default function SalePage() {
   const [customerReceived, setCustomerReceived] = useState<string>('')
   /** У какой позиции сейчас раскрыты быстрые скидки. */
   const [discountFor, setDiscountFor] = useState<string | null>(null)
+  /** На телефоне каталог и чек не помещаются рядом — это две вкладки. */
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog')
   const searchRef = useRef<HTMLInputElement>(null)
 
+  function focusSearch() {
+    if (hasHardwareKeyboard()) searchRef.current?.focus()
+  }
+
   useEffect(() => {
-    searchRef.current?.focus()
+    focusSearch()
   }, [])
+
+  const cartQty = (id: string) => cart.find((l) => l.product.id === id)?.quantity ?? 0
 
   function addToCart(product: ProductSearchResult) {
     setCart((prev) => {
       const existing = prev.find((l) => l.product.id === product.id)
       if (existing) {
+        if (existing.quantity >= product.shop_qty) {
+          push(`«${product.name}» — на витрине только ${formatQty(product.shop_qty)}`, 'error')
+          return prev
+        }
         return prev.map((l) =>
           l.product.id === product.id ? { ...l, quantity: Math.min(l.quantity + 1, product.shop_qty) } : l
         )
@@ -73,8 +160,6 @@ export default function SalePage() {
       }
       return [...prev, { product, quantity: 1, finalPrice: parseFloat(product.sale_price) }]
     })
-    setQuery('')
-    searchRef.current?.focus()
   }
 
   function updateQty(id: string, qty: number) {
@@ -116,7 +201,11 @@ export default function SalePage() {
   const total = cart.reduce((s, l) => s + l.finalPrice * l.quantity, 0)
   const discountTotal = subtotal - total
   const discountPct = discountPercent(subtotal, total)
-  const change = payMethod === 'cash' && customerReceived ? Math.max(0, parseFloat(customerReceived) - total) : null
+  const totalItems = cart.reduce((s, l) => s + l.quantity, 0)
+  const change =
+    !splitMode && payMethod === 'cash' && customerReceived
+      ? Math.max(0, parseFloat(customerReceived) - total)
+      : null
 
   const limit = permissions?.discount_limit_percent
   const isOverLimit = (l: CartLine) => {
@@ -133,7 +222,9 @@ export default function SalePage() {
     setSplitMode(false)
     setSplitAmounts({ cash: 0, kaspi_qr: 0, card: 0, transfer: 0 })
     setIdempotencyKey(uuid())
-    searchRef.current?.focus()
+    setMobileTab('catalog')
+    setQuery('')
+    focusSearch()
   }
 
   async function submitSale() {
@@ -153,6 +244,11 @@ export default function SalePage() {
         payments,
       })
       push(`Продажа №${data.number} проведена`, 'success')
+      // Каталог кассы показывает остатки зала — после продажи они другие.
+      qc.invalidateQueries({ queryKey: ['product-search'] })
+      qc.invalidateQueries({ queryKey: ['stock'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['sales'] })
       setConfirmOpen(false)
       resetSale()
     } catch (err) {
@@ -164,340 +260,425 @@ export default function SalePage() {
 
   const splitSum = Object.values(splitAmounts).reduce((s, v) => s + (v || 0), 0)
   const canConfirm = cart.length > 0 && (!splitMode || Math.abs(splitSum - total) < 0.01)
+  const searching = query.trim().length >= 2
 
   return (
-    <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-4 space-y-4 lg:space-y-0">
-      <div className="lg:col-span-2">
-        <ShiftBar />
-      </div>
+    <div className="space-y-4">
+      <ShiftBar />
 
-      <div className="space-y-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-muted" size={18} />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск по названию, коду, OEM или штрихкоду…"
-            className={`${fieldClass} h-12 rounded-2xl pl-10 text-base sm:text-sm`}
-          />
-          {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" size={16} />}
-        </div>
-
-        {query.trim().length >= 2 && (
-          <div className="rounded-2xl border border-line bg-surface divide-y divide-line max-h-80 overflow-y-auto">
-            {results?.length === 0 && <div className="p-4 text-sm text-fg-muted">Ничего не найдено</div>}
-            {results?.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-muted"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-fg truncate">{p.name}</div>
-                  <div className="text-xs text-gray-400">{p.sku} {p.oem_code && `· ${p.oem_code}`}</div>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-sm font-semibold tabular-nums">{formatMoney(p.sale_price)}</div>
-                  <div className={`text-xs ${p.shop_qty < p.min_stock ? 'text-red-600 dark:text-red-400' : 'text-gray-400'}`}>
-                    на витрине: {formatQty(p.shop_qty)}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Корзина. Карточками, а не таблицей: на телефоне таблица с ценой,
-            количеством и скидкой не помещается, а на компьютере карточка
-            позволяет крупно показать и прайс, и цену продажи, и размер скидки. */}
-        {cart.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line-strong px-4 py-12 text-center text-sm text-gray-400">
-            Корзина пуста. Найдите товар в строке поиска выше.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {cart.map((l) => {
-              const base = parseFloat(l.product.sale_price)
-              const pct = discountPercent(base, l.finalPrice)
-              const hasDiscount = pct > 0
-              const overLimit = isOverLimit(l)
-              const discountOpen = discountFor === l.product.id
-              return (
-                <div
-                  key={l.product.id}
-                  className={`rounded-2xl border bg-surface p-3 shadow-card transition-colors ${
-                    overLimit ? 'border-amber-300 dark:border-amber-800' : 'border-line'
-                  }`}
-                >
-                  {/* Строка товара: название и всё управление — в две строки.
-                      Раньше каждая позиция занимала пять рядов с подписями и
-                      четырьмя кнопками скидок; в зале это лишний шум, а скидка
-                      нужна не в каждой продаже. Теперь она под кнопкой «%». */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium leading-snug text-fg">{l.product.name}</div>
-                      <div className="text-xs text-fg-muted">{l.product.sku}</div>
-                    </div>
-                    <button
-                      onClick={() => removeLine(l.product.id)}
-                      aria-label="Убрать из корзины"
-                      className="-mt-1 -mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-fg-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <div className="flex items-center rounded-xl border border-line-strong">
-                      <button
-                        onClick={() => updateQty(l.product.id, l.quantity - 1)}
-                        aria-label="Меньше"
-                        className="flex h-10 w-10 items-center justify-center rounded-l-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <input
-                        inputMode="decimal"
-                        value={l.quantity}
-                        onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
-                        aria-label="Количество"
-                        className="h-10 w-11 border-x border-line-strong bg-transparent text-center text-sm tabular-nums text-fg outline-none"
-                      />
-                      <button
-                        onClick={() => updateQty(l.product.id, l.quantity + 1)}
-                        aria-label="Больше"
-                        className="flex h-10 w-10 items-center justify-center rounded-r-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-
-                    <div className="relative min-w-28 flex-1">
-                      <input
-                        inputMode="numeric"
-                        value={l.finalPrice}
-                        onChange={(e) => updatePrice(l.product.id, parseFloat(e.target.value) || 0)}
-                        aria-label="Цена продажи"
-                        className={`h-10 w-full rounded-xl border bg-transparent pr-7 pl-3 text-right text-sm font-semibold tabular-nums outline-none ${
-                          hasDiscount
-                            ? 'border-amber-300 text-amber-600 dark:border-amber-800 dark:text-amber-400'
-                            : 'border-line-strong text-fg'
-                        }`}
-                      />
-                      <span className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs text-fg-muted">₸</span>
-                    </div>
-
-                    <button
-                      onClick={() => setDiscountFor(discountOpen ? null : l.product.id)}
-                      aria-label="Скидка"
-                      title="Скидка"
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
-                        discountOpen || hasDiscount
-                          ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                          : 'border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg'
-                      }`}
-                    >
-                      <Percent size={15} />
-                    </button>
-
-                    <div className="ml-auto text-right text-base font-semibold tabular-nums text-fg">
-                      {formatMoney(l.finalPrice * l.quantity)}
-                    </div>
-                  </div>
-
-                  {hasDiscount && (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                      <span className="text-fg-muted line-through tabular-nums">{formatMoney(base)}</span>
-                      <span className="font-medium text-amber-600 dark:text-amber-400">
-                        скидка {pct.toFixed(pct < 10 ? 1 : 0)}% · −{formatMoney((base - l.finalPrice) * l.quantity)}
-                      </span>
-                      {overLimit && (
-                        <span className="text-amber-700 dark:text-amber-300">выше лимита {limit}%</span>
-                      )}
-                      <button
-                        onClick={() => resetPrice(l.product.id)}
-                        className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-fg-muted hover:bg-surface-muted hover:text-fg"
-                      >
-                        <RotateCcw size={11} /> вернуть прайс
-                      </button>
-                    </div>
-                  )}
-
-                  {discountOpen && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line pt-2">
-                      <span className="mr-1 text-xs text-fg-muted">Скидка:</span>
-                      {QUICK_DISCOUNTS.map((d) => (
-                        <button
-                          key={d}
-                          onClick={() => {
-                            applyDiscount(l.product.id, d)
-                            setDiscountFor(null)
-                          }}
-                          className="rounded-lg border border-line-strong px-2.5 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
-                        >
-                          −{d}%
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => {
-                          resetPrice(l.product.id)
-                          setDiscountFor(null)
-                        }}
-                        className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
-                      >
-                        без скидки
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Панель оплаты: справа на компьютере, внизу страницы на телефоне */}
-      <div className="rounded-2xl border border-line bg-surface p-4 h-fit lg:sticky lg:top-4 space-y-4">
-        {/* Без скидки строки «по прайсу» и «скидка» показывали бы то же самое
-            число трижды — поэтому они появляются только когда есть торг. */}
-        <div className="text-sm">
-          {discountTotal > 0 && (
-            <div className="mb-2 space-y-1.5">
-              <div className="flex justify-between text-fg-muted">
-                <span>По прайсу</span>
-                <span className="tabular-nums">{formatMoney(subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                <span>Скидка {discountPct >= 0.5 && `${discountPct.toFixed(discountPct < 10 ? 1 : 0)}%`}</span>
-                <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
-              </div>
-            </div>
-          )}
-          <div className="flex items-baseline justify-between">
-            <span className="text-fg-muted">Итого</span>
-            <span className="text-2xl font-semibold tracking-tight tabular-nums text-fg">
-              {formatMoney(total)}
-            </span>
-          </div>
-        </div>
-
-        {overLimitLines.length > 0 && (
-          <div className="flex items-start gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 text-xs px-3 py-2">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            Скидка выше лимита ({limit}%) — потребуется подтверждение владельца.
-          </div>
-        )}
-        {belowCostWarning && (
-          <div className="flex items-start gap-2 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs px-3 py-2">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            Цена одной из позиций равна нулю — проверьте перед подтверждением.
-          </div>
-        )}
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Способ оплаты</span>
-            <button onClick={() => setSplitMode((v) => !v)} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline">
-              {splitMode ? 'Один способ' : 'Разделить оплату'}
-            </button>
-          </div>
-
-          {!splitMode ? (
-            <div className="grid grid-cols-3 gap-2">
-              {PAYMENT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setPayMethod(opt.value)}
-                  className={`rounded-xl border px-2 py-3 text-sm font-medium transition-colors ${
-                    payMethod === opt.value
-                      ? 'border-gray-900 dark:border-gray-100 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                      : 'border-line-strong text-gray-600 dark:text-gray-300'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {PAYMENT_OPTIONS.map((opt) => (
-                <div key={opt.value} className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-300 w-24">{opt.label}</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={splitAmounts[opt.value] || ''}
-                    onChange={(e) =>
-                      setSplitAmounts((prev) => ({ ...prev, [opt.value]: parseFloat(e.target.value) || 0 }))
-                    }
-                    className={`flex-1 ${fieldClass} h-10 text-right tabular-nums`}
-                    placeholder="0"
-                  />
-                </div>
-              ))}
-              <div className={`text-xs text-right ${Math.abs(splitSum - total) < 0.01 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                Введено: {formatMoney(splitSum)} из {formatMoney(total)}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {!splitMode && payMethod === 'cash' && (
-          <div>
-            <label className="text-xs text-fg-muted">Получено наличными</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={customerReceived}
-              onChange={(e) => setCustomerReceived(e.target.value)}
-              className={`mt-1 ${fieldClass} h-11 text-right tabular-nums`}
-              placeholder={String(total)}
-            />
-            {change !== null && customerReceived && (
-              <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Сдача: {formatMoney(change)}</div>
-            )}
-          </div>
-        )}
-
-        {/* На телефоне ту же кнопку показывает закреплённая внизу полоса итога,
-            и две одинаковые кнопки подряд только путали. */}
-        <button
-          disabled={!canConfirm}
-          onClick={() => setConfirmOpen(true)}
-          className="hidden h-12 w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 lg:inline-flex dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
-        >
-          Оформить продажу
-        </button>
-      </div>
-
-      {/* Итог и кнопка всегда под рукой на телефоне: корзина длинная, а
-          прокручивать вниз к панели оплаты ради каждой продажи неудобно. */}
+      {/* На телефоне каталог и чек — две вкладки: иначе чек уезжает под
+          длинный список товаров, и до итога надо прокручивать всю витрину. */}
       {cart.length > 0 && (
-        <div className="lg:hidden fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-surface/95 backdrop-blur px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
-          <div className="flex items-center gap-3">
-            <div className="min-w-0">
-              <div className="text-[11px] text-fg-muted">
-                Итого{discountTotal > 0 && ` · скидка ${formatMoney(discountTotal)}`}
-              </div>
-              <div className="text-lg font-semibold tabular-nums text-fg leading-tight">
-                {formatMoney(total)}
-              </div>
-            </div>
+        <div className="lg:hidden grid grid-cols-2 gap-1 rounded-xl bg-surface-muted p-1">
+          {(
+            [
+              ['catalog', 'Товары'],
+              ['cart', `Чек · ${cart.length}`],
+            ] as const
+          ).map(([key, label]) => (
             <button
-              disabled={!canConfirm}
-              onClick={() => setConfirmOpen(true)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white ml-auto h-12 shrink-0 px-5"
+              key={key}
+              onClick={() => setMobileTab(key)}
+              className={clsx(
+                'h-9 rounded-lg text-sm font-medium transition-colors',
+                mobileTab === key ? 'bg-surface text-fg shadow-card' : 'text-fg-muted',
+              )}
             >
-              Оформить
+              {label}
             </button>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Пустое место под плавающей панелью итога, иначе она закрывает
-          нижнюю часть корзины при прокрутке до конца. */}
-      {cart.length > 0 && <div className="lg:hidden h-24" aria-hidden />}
+      <div className="lg:grid lg:grid-cols-[1fr_380px] lg:gap-4 lg:items-start">
+        {/* ── Каталог ───────────────────────────────────────────────── */}
+        <div className={clsx('space-y-3', cart.length > 0 && mobileTab === 'cart' && 'hidden lg:block')}>
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-fg-muted" size={18} />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Название, код, OEM или штрихкод"
+              className={`${fieldClass} h-12 rounded-2xl pr-10 pl-10 text-base sm:text-sm`}
+            />
+            {query ? (
+              <button
+                onClick={() => {
+                  setQuery('')
+                  focusSearch()
+                }}
+                aria-label="Очистить поиск"
+                className="absolute top-1/2 right-2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+              >
+                <X size={16} />
+              </button>
+            ) : (
+              isFetching && <Loader2 className="absolute top-1/2 right-3.5 -translate-y-1/2 animate-spin text-fg-muted" size={16} />
+            )}
+          </div>
+
+          <div className="flex items-baseline justify-between px-0.5">
+            <span className="text-xs font-semibold tracking-wide text-fg-muted uppercase">
+              {searching ? 'Найдено' : 'На витрине'}
+            </span>
+            {results && results.length > 0 && <span className="text-xs text-fg-muted">{results.length}</span>}
+          </div>
+
+          {!results ? (
+            <SkeletonList rows={4} />
+          ) : results.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line-strong px-4 py-10 text-center text-sm text-fg-muted">
+              {searching ? 'Ничего не найдено — проверьте код или название' : 'В зале пока нет товаров'}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+              {results.map((p) => {
+                const inCart = cartQty(p.id)
+                const soldOut = p.shop_qty <= 0
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => addToCart(p)}
+                    disabled={soldOut}
+                    className={clsx(
+                      'flex w-full items-center justify-between gap-3 rounded-xl border bg-surface px-3 py-2.5 text-left transition-colors',
+                      soldOut
+                        ? 'cursor-not-allowed border-line opacity-50'
+                        : inCart
+                          ? 'border-gray-900 dark:border-gray-100'
+                          : 'border-line hover:border-line-strong hover:bg-surface-muted active:scale-[0.99]',
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="line-clamp-2 text-sm leading-snug font-medium text-fg">{p.name}</div>
+                      <div className="mt-0.5 truncate text-xs text-fg-muted">
+                        {p.sku}
+                        {p.oem_code && ` · ${p.oem_code}`}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <div className="text-right">
+                        <div className="text-sm font-semibold tabular-nums text-fg">{formatMoney(p.sale_price)}</div>
+                        <div
+                          className={clsx(
+                            'text-xs tabular-nums',
+                            soldOut
+                              ? 'text-fg-muted'
+                              : p.shop_qty < p.min_stock
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-fg-muted',
+                          )}
+                        >
+                          {soldOut ? 'нет в зале' : `${formatQty(p.shop_qty)} в зале`}
+                        </div>
+                      </div>
+                      <span
+                        className={clsx(
+                          'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold tabular-nums',
+                          inCart
+                            ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                            : 'bg-surface-muted text-fg-muted',
+                        )}
+                      >
+                        {inCart || <Plus size={15} />}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Чек ───────────────────────────────────────────────────── */}
+        <div
+          className={clsx(
+            'mt-4 space-y-3 lg:sticky lg:top-4 lg:mt-0',
+            cart.length > 0 && mobileTab === 'catalog' && 'hidden lg:block',
+            cart.length === 0 && 'hidden lg:block',
+          )}
+        >
+          <div className="rounded-2xl border border-line bg-surface">
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <span className="text-sm font-semibold text-fg">
+                Чек{cart.length > 0 && <span className="ml-1.5 font-normal text-fg-muted">{formatQty(totalItems)} шт</span>}
+              </span>
+              {cart.length > 0 && (
+                <button
+                  onClick={resetSale}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+                >
+                  Очистить
+                </button>
+              )}
+            </div>
+
+            {cart.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <span className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-muted text-fg-muted">
+                  <ShoppingCart size={18} />
+                </span>
+                <div className="text-sm text-fg-muted">Нажмите товар слева, чтобы добавить его в чек</div>
+              </div>
+            ) : (
+              <div className="max-h-[45vh] divide-y divide-line overflow-y-auto lg:max-h-[42vh]">
+                {cart.map((l) => {
+                  const base = parseFloat(l.product.sale_price)
+                  const pct = discountPercent(base, l.finalPrice)
+                  const hasDiscount = pct > 0
+                  const overLimit = isOverLimit(l)
+                  const discountOpen = discountFor === l.product.id
+                  return (
+                    <div key={l.product.id} className={clsx('px-3 py-2.5', overLimit && 'bg-amber-50/60 dark:bg-amber-950/20')}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm leading-snug font-medium text-fg">{l.product.name}</div>
+                          <div className="text-xs text-fg-muted">{l.product.sku}</div>
+                        </div>
+                        <div className="shrink-0 text-right text-sm font-semibold tabular-nums text-fg">
+                          {formatMoney(l.finalPrice * l.quantity)}
+                        </div>
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <div className="flex items-center rounded-lg border border-line-strong">
+                          <button
+                            onClick={() => updateQty(l.product.id, l.quantity - 1)}
+                            aria-label="Меньше"
+                            className="flex h-9 w-9 items-center justify-center rounded-l-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <input
+                            inputMode="decimal"
+                            value={l.quantity}
+                            onChange={(e) => updateQty(l.product.id, parseFloat(e.target.value) || 0)}
+                            aria-label="Количество"
+                            className="h-9 w-10 border-x border-line-strong bg-transparent text-center text-sm tabular-nums text-fg outline-none focus-visible:outline-none"
+                          />
+                          <button
+                            onClick={() => updateQty(l.product.id, l.quantity + 1)}
+                            aria-label="Больше"
+                            className="flex h-9 w-9 items-center justify-center rounded-r-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+
+                        <PriceInput
+                          value={l.finalPrice}
+                          onChange={(v) => updatePrice(l.product.id, v)}
+                          highlighted={hasDiscount}
+                        />
+
+                        <button
+                          onClick={() => setDiscountFor(discountOpen ? null : l.product.id)}
+                          aria-label="Скидка"
+                          title="Скидка"
+                          className={clsx(
+                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border',
+                            discountOpen || hasDiscount
+                              ? 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                              : 'border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg',
+                          )}
+                        >
+                          <Percent size={14} />
+                        </button>
+
+                        <button
+                          onClick={() => removeLine(l.product.id)}
+                          aria-label="Убрать из чека"
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+
+                      {hasDiscount && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          <span className="text-fg-muted tabular-nums line-through">{formatMoney(base)}</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">
+                            −{pct.toFixed(pct < 10 ? 1 : 0)}%
+                            {overLimit && ` · выше лимита ${limit}%`}
+                          </span>
+                          <button
+                            onClick={() => resetPrice(l.product.id)}
+                            className="ml-auto inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            <RotateCcw size={11} /> прайс
+                          </button>
+                        </div>
+                      )}
+
+                      {discountOpen && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-line pt-2">
+                          <span className="mr-1 text-xs text-fg-muted">Скидка:</span>
+                          {QUICK_DISCOUNTS.map((d) => (
+                            <button
+                              key={d}
+                              onClick={() => {
+                                applyDiscount(l.product.id, d)
+                                setDiscountFor(null)
+                              }}
+                              className="rounded-lg border border-line-strong px-2.5 py-1.5 text-xs font-semibold text-fg-muted hover:bg-surface-muted hover:text-fg"
+                            >
+                              −{d}%
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => {
+                              resetPrice(l.product.id)
+                              setDiscountFor(null)
+                            }}
+                            className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            без скидки
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Итог и оплата — отдельная карточка: это другой шаг, и на него
+              смотрят, когда с товарами уже разобрались. */}
+          <div className="space-y-3 rounded-2xl border border-line bg-surface p-4">
+            <div className="text-sm">
+              {discountTotal > 0 && (
+                <div className="mb-2 space-y-1.5">
+                  <div className="flex justify-between text-fg-muted">
+                    <span>По прайсу</span>
+                    <span className="tabular-nums">{formatMoney(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                    <span>Скидка {discountPct >= 0.5 && `${discountPct.toFixed(discountPct < 10 ? 1 : 0)}%`}</span>
+                    <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-baseline justify-between">
+                <span className="text-fg-muted">Итого</span>
+                <span className="text-2xl font-semibold tracking-tight tabular-nums text-fg">{formatMoney(total)}</span>
+              </div>
+            </div>
+
+            {overLimitLines.length > 0 && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                Скидка выше лимита ({limit}%) — потребуется подтверждение владельца.
+              </div>
+            )}
+            {!shift && (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                Смена не открыта — продажа пройдёт, но в сверку кассы не попадёт.
+              </div>
+            )}
+            {belowCostWarning && (
+              <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                Цена одной из позиций равна нулю — проверьте перед подтверждением.
+              </div>
+            )}
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs font-semibold tracking-wide text-fg-muted uppercase">Оплата</span>
+                <button
+                  onClick={() => setSplitMode((v) => !v)}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-fg-muted hover:bg-surface-muted hover:text-fg"
+                >
+                  {splitMode ? 'Один способ' : 'Разделить'}
+                </button>
+              </div>
+
+              {!splitMode ? (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {PAYMENT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setPayMethod(opt.value)}
+                      className={clsx(
+                        'h-11 rounded-xl border px-2 text-sm font-medium transition-colors',
+                        payMethod === opt.value
+                          ? 'border-gray-900 bg-gray-900 text-white dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900'
+                          : 'border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg',
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {PAYMENT_OPTIONS.map((opt) => (
+                    <div key={opt.value} className="flex items-center gap-2">
+                      <span className="w-24 shrink-0 text-sm text-fg-muted">{opt.label}</span>
+                      <input
+                        inputMode="numeric"
+                        value={splitAmounts[opt.value] || ''}
+                        onChange={(e) =>
+                          setSplitAmounts((prev) => ({ ...prev, [opt.value]: parseFloat(e.target.value) || 0 }))
+                        }
+                        className={`flex-1 ${fieldClass} h-10 text-right tabular-nums`}
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                  <div
+                    className={clsx(
+                      'text-right text-xs tabular-nums',
+                      Math.abs(splitSum - total) < 0.01
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400',
+                    )}
+                  >
+                    Введено {formatMoney(splitSum)} из {formatMoney(total)}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              disabled={!canConfirm}
+              onClick={() => setConfirmOpen(true)}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+            >
+              Оформить продажу
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Пока продавец набирает товары, итог и кнопка держатся внизу экрана —
+          иначе за каждой продажей пришлось бы переключаться на вкладку чека. */}
+      {cart.length > 0 && mobileTab === 'catalog' && (
+        <>
+          <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-line bg-surface/95 px-4 py-2.5 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur lg:hidden">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setMobileTab('cart')} className="min-w-0 text-left">
+                <div className="text-[11px] text-fg-muted">
+                  Чек · {cart.length}
+                  {discountTotal > 0 && ` · скидка ${formatMoney(discountTotal)}`}
+                </div>
+                <div className="text-lg leading-tight font-semibold tabular-nums text-fg">{formatMoney(total)}</div>
+              </button>
+              <button
+                disabled={!canConfirm}
+                onClick={() => setConfirmOpen(true)}
+                className="ml-auto inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 text-sm font-semibold text-white transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 dark:bg-gray-100 dark:text-gray-900"
+              >
+                Оформить
+              </button>
+            </div>
+          </div>
+          <div className="h-24 lg:hidden" aria-hidden />
+        </>
+      )}
 
       <Modal
         open={confirmOpen}
@@ -529,7 +710,7 @@ export default function SalePage() {
             const pct = discountPercent(base, l.finalPrice)
             return (
               <div key={l.product.id} className="flex justify-between gap-3">
-                <span className="text-gray-600 dark:text-gray-300 min-w-0">
+                <span className="min-w-0 text-fg-muted">
                   {l.product.name} ×{formatQty(l.quantity)}
                   {pct > 0 && (
                     <span className="block text-xs text-amber-600 dark:text-amber-400">
@@ -537,29 +718,74 @@ export default function SalePage() {
                     </span>
                   )}
                 </span>
-                <span className="font-medium tabular-nums shrink-0">{formatMoney(l.finalPrice * l.quantity)}</span>
+                <span className="shrink-0 font-medium tabular-nums text-fg">{formatMoney(l.finalPrice * l.quantity)}</span>
               </div>
             )
           })}
-          <div className="border-t border-line pt-2 space-y-1">
-            <div className="flex justify-between text-fg-muted">
-              <span>Сумма по прайсу</span>
-              <span className="tabular-nums">{formatMoney(subtotal)}</span>
-            </div>
+          <div className="space-y-1 border-t border-line pt-2">
             {discountTotal > 0 && (
-              <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                <span>Скидка</span>
-                <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
-              </div>
+              <>
+                <div className="flex justify-between text-fg-muted">
+                  <span>Сумма по прайсу</span>
+                  <span className="tabular-nums">{formatMoney(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                  <span>Скидка</span>
+                  <span className="tabular-nums">−{formatMoney(discountTotal)}</span>
+                </div>
+              </>
             )}
             <div className="flex justify-between text-base font-semibold text-fg">
               <span>Итого к оплате</span>
               <span className="tabular-nums">{formatMoney(total)}</span>
             </div>
-            <div className="text-fg-muted pt-1">
+            <div className="pt-1 text-fg-muted">
               Оплата: {splitMode ? 'смешанная' : PAYMENT_OPTIONS.find((o) => o.value === payMethod)?.label}
             </div>
           </div>
+
+          {/* Сдача нужна ровно здесь — в момент, когда покупатель протягивает
+              деньги. В панели оплаты это поле только просило заполнить себя. */}
+          {!splitMode && payMethod === 'cash' && (
+            <div className="border-t border-line pt-3">
+              <div className="mb-1.5 text-xs font-medium text-fg-muted">Покупатель дал — если нужна сдача</div>
+              <div className="flex flex-wrap gap-1.5">
+                {cashSuggestions(total).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setCustomerReceived(customerReceived === String(v) ? '' : String(v))}
+                    className={clsx(
+                      'h-9 rounded-lg border px-2.5 text-xs font-semibold tabular-nums transition-colors',
+                      customerReceived === String(v)
+                        ? 'border-gray-900 bg-gray-900 text-white dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900'
+                        : 'border-line-strong text-fg-muted hover:bg-surface-muted hover:text-fg',
+                    )}
+                  >
+                    {formatMoney(v)}
+                  </button>
+                ))}
+                <div className="relative min-w-24 flex-1">
+                  <input
+                    inputMode="numeric"
+                    value={cashSuggestions(total).includes(Number(customerReceived)) ? '' : customerReceived}
+                    onChange={(e) => setCustomerReceived(e.target.value)}
+                    aria-label="Получено наличными"
+                    placeholder="другая сумма"
+                    className="h-9 w-full rounded-lg border border-line-strong bg-transparent pr-6 pl-2.5 text-right text-sm font-semibold tabular-nums text-fg outline-none placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                  />
+                  <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-xs text-fg-muted">₸</span>
+                </div>
+              </div>
+              {change !== null && (
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-fg-muted">Сдача</span>
+                  <span className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                    {formatMoney(change)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     </div>
