@@ -21,7 +21,20 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 SEED_PATH = BASE_DIR / "db_seed.sqlite3"
 
-external_db = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = (os.environ.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+# Интеграция Postgres на Vercel создаёт сразу несколько переменных с разными
+# именами — проверяем все, иначе «база подключена, а сборка её не видит».
+external_db = _first_env("DATABASE_URL", "POSTGRES_URL", "POSTGRES_PRISMA_URL", "NEON_DATABASE_URL")
+
+# Миграции катаем по прямому адресу: через пул в transaction-режиме они рвутся.
+migration_db = _first_env("DATABASE_URL_UNPOOLED", "POSTGRES_URL_NON_POOLING", "DIRECT_URL") or external_db
 
 
 def run(*args: str, env: dict | None = None) -> None:
@@ -31,9 +44,10 @@ def run(*args: str, env: dict | None = None) -> None:
 
 if external_db:
     print("Найдена внешняя база — накатываю миграции на неё.", flush=True)
-    run("migrate", "--noinput")
+    db_env = {**os.environ, "DATABASE_URL": migration_db}
+    run("migrate", "--noinput", env=db_env)
     if os.environ.get("AUTOZAP_SEED_DEMO", "1") == "1":
-        run("seed_demo")
+        run("seed_demo", env=db_env)
 else:
     print(
         "Внешняя база не подключена — собираю готовый файл демо-базы.\n"

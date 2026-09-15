@@ -169,16 +169,33 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 #
-# Приоритет — внешняя база: хостинг-интеграции (Postgres/Neon на Vercel)
-# кладут строку подключения в DATABASE_URL, некоторые — ещё и в POSTGRES_URL.
-# Подключили базу в панели — приложение само её подхватит, менять код не нужно.
-#
-# Если внешней базы нет, работает SQLite. На Vercel каталог с кодом доступен
-# только на чтение, поэтому файл базы кладётся во временный каталог (TMPDIR,
-# обычно /tmp) — единственное место, куда функции разрешено писать. Такая база
-# живёт до перезапуска экземпляра: для показа демо этого достаточно, для
-# постоянного хранения — подключите Postgres (см. README).
-_database_url = env("DATABASE_URL", default="") or env("POSTGRES_URL", default="")
+# Строку подключения к внешней базе разные хостинги кладут в разные переменные:
+# интеграция Postgres/Neon на Vercel создаёт сразу несколько. Читаем все
+# известные имена, чтобы «подключил базу в панели — и заработало» было правдой,
+# а не инструкцией на три экрана.
+def _first_env(*names: str) -> str:
+    for name in names:
+        value = (env(name, default="") or "").strip()
+        if value:
+            return value
+    return ""
+
+
+_database_url = _first_env(
+    "DATABASE_URL",
+    "POSTGRES_URL",
+    "POSTGRES_PRISMA_URL",
+    "NEON_DATABASE_URL",
+)
+
+# Прямое подключение в обход пула. Миграции через pgbouncer в transaction-режиме
+# рвутся на середине (он не держит сессионные блокировки), поэтому схему всегда
+# катаем по прямому адресу, а запросы приложения идут через пул.
+MIGRATION_DATABASE_URL = _first_env(
+    "DATABASE_URL_UNPOOLED",
+    "POSTGRES_URL_NON_POOLING",
+    "DIRECT_URL",
+) or _database_url
 
 # Готовый файл базы, который собирается на этапе сборки (vercel_build.py):
 # при старте он копируется во временный каталог, чтобы не выполнять миграции
@@ -187,13 +204,44 @@ SQLITE_SEED_PATH = BASE_DIR / "db_seed.sqlite3"
 
 if _database_url:
     DATABASES = {"default": env.db_url_config(_database_url)}
+    default_db = DATABASES["default"]
+    options = dict(default_db.get("OPTIONS") or {})
+    # Обрыв связи с базой не должен вешать запрос на полминуты.
+    options.setdefault("connect_timeout", 10)
+    if default_db.get("ENGINE", "").endswith("postgresql"):
+        # Облачные базы (Neon, Supabase, RDS) принимают только TLS. Локальный
+        # Postgres из docker-compose — наоборот, обычно без него, поэтому
+        # требуем шифрование лишь там, где приложение действительно в облаке.
+        default_ssl = "require" if ON_VERCEL else ""
+        sslmode = env("DB_SSLMODE", default=default_ssl)
+        if sslmode and "sslmode" not in _database_url:
+            options.setdefault("sslmode", sslmode)
+    default_db["OPTIONS"] = options
+    # На serverless процесс живёт один запрос: переиспользовать соединение
+    # некому, а незакрытые быстро выбирают лимит подключений базы — и всё
+    # приложение начинает отвечать ошибками «too many connections».
+    default_db["CONN_MAX_AGE"] = 0 if ON_VERCEL else env.int("DB_CONN_MAX_AGE", default=60)
     SQLITE_RUNTIME_PATH = None
+    # Данные переживут перезапуск: это настоящая база, а не файл в /tmp.
+    STORAGE_IS_EPHEMERAL = False
 else:
     if ON_VERCEL:
+        # На Vercel каталог с кодом доступен только на чтение, а /tmp живёт
+        # ровно столько, сколько живёт конкретный экземпляр функции: соседний
+        # запрос может попасть на другой экземпляр и не увидеть записанного.
+        # Для показа демо этого хватает, для работы магазина — нет (README,
+        # раздел «Чтобы данные сохранялись»).
         SQLITE_RUNTIME_PATH = Path(tempfile.gettempdir()) / "autozap.sqlite3"
+        STORAGE_IS_EPHEMERAL = True
     else:
         SQLITE_RUNTIME_PATH = BASE_DIR / "db.sqlite3"
+        STORAGE_IS_EPHEMERAL = False
     DATABASES = {"default": env.db_url_config(f"sqlite:///{SQLITE_RUNTIME_PATH}")}
+
+# Наполнять ли пустую базу демо-данными (склады, роли, несколько товаров).
+# Для настоящего магазина поставьте AUTOZAP_SEED_DEMO=0 — тогда база
+# поднимется пустой, и в ней не будет чужих «Колодок тормозных».
+SEED_DEMO_ON_EMPTY = env.bool("AUTOZAP_SEED_DEMO", default=True)
 
 AUTH_USER_MODEL = "accounts.User"
 

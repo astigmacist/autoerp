@@ -1,9 +1,26 @@
 import { useQuery } from '@tanstack/react-query'
-import { api } from './client'
+import axios from 'axios'
+import { api, API_ROOT } from './client'
 import type {
   Brand, Category, DashboardData, InventoryDoc, Paginated, Product, ProductSearchResult,
   Receipt, Shift, StockRow, Supplier, Transfer, TransferSuggestion, Warehouse, WriteOff,
 } from './types'
+
+/** Где приложение хранит данные. Нужен, чтобы честно предупредить о демо-режиме. */
+export interface HealthInfo {
+  status: string
+  storage: 'persistent' | 'ephemeral'
+  database: string
+}
+
+export function useHealth() {
+  return useQuery({
+    queryKey: ['health'],
+    queryFn: async () => (await axios.get<HealthInfo>(`${API_ROOT}/api/health/`)).data,
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
 
 export function useWarehouses() {
   return useQuery({

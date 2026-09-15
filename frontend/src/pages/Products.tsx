@@ -1,25 +1,30 @@
 import { useState } from 'react'
-import { Pencil, Plus, Archive, ArchiveRestore, Package } from 'lucide-react'
+import { Pencil, Plus, Archive, ArchiveRestore, Package, History } from 'lucide-react'
 import { useProducts } from '@/api/queries'
+import { useDebounced } from '@/lib/useDebounced'
 import { useAuth } from '@/store/auth'
 import { formatMoney, formatQty } from '@/lib/format'
 import { api, getApiError } from '@/api/client'
 import { useToast } from '@/store/toast'
 import { useQueryClient } from '@tanstack/react-query'
 import ProductFormModal from '@/components/ProductFormModal'
+import ProductMovementsModal from '@/components/ProductMovementsModal'
 import type { Product } from '@/api/types'
 import { Card, EmptyState, SkeletonList, SkeletonRows, Toggle, fieldClass } from '@/components/ui'
 
 export default function Products() {
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
-  const { data, isLoading } = useProducts({ search: search || undefined })
+  const debouncedSearch = useDebounced(search, 300)
+  const { data, isLoading } = useProducts({ search: debouncedSearch || undefined })
   const { permissions } = useAuth()
   const { push } = useToast()
   const qc = useQueryClient()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
+  /** Товар, чью историю движений сейчас смотрят. */
+  const [historyFor, setHistoryFor] = useState<Product | null>(null)
 
   const canManage = !!permissions?.can_manage_catalog
 
@@ -94,8 +99,17 @@ export default function Products() {
                     {!p.is_active && ' · в архиве'}
                   </div>
                 </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => setHistoryFor(p)}
+                    aria-label="Движения товара"
+                    title="Движения товара"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-fg-muted hover:bg-surface-muted hover:text-fg"
+                  >
+                    <History size={15} />
+                  </button>
                 {canManage && (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <>
                     <button
                       onClick={() => openEdit(p)}
                       aria-label="Редактировать"
@@ -110,8 +124,9 @@ export default function Products() {
                     >
                       {p.is_active ? <Archive size={15} /> : <ArchiveRestore size={15} />}
                     </button>
-                  </div>
+                  </>
                 )}
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-muted">
                 <span>
@@ -170,32 +185,47 @@ export default function Products() {
                   <td className={`px-4 py-2.5 text-right tabular-nums ${shop && parseFloat(shop.quantity) < p.min_stock ? 'text-red-600 font-semibold' : ''}`}>
                     {shop ? formatQty(shop.quantity) : 0}
                   </td>
-                  {canManage && (
-                    <td className="px-4 py-2.5 text-right">
-                      <div className="row-actions flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openEdit(p)}
-                          title="Редактировать"
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => toggleActive(p)}
-                          title={p.is_active ? 'В архив' : 'Восстановить'}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
-                        >
-                          {p.is_active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
-                        </button>
-                      </div>
-                    </td>
-                  )}
+                  <td className="px-4 py-2.5 text-right">
+                    <div className="row-actions flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => setHistoryFor(p)}
+                        title="Движения товара"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        <History size={14} />
+                      </button>
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => openEdit(p)}
+                            title="Редактировать"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => toggleActive(p)}
+                            title={p.is_active ? 'В архив' : 'Восстановить'}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                          >
+                            {p.is_active ? <Archive size={14} /> : <ArchiveRestore size={14} />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+
+      <ProductMovementsModal
+        productId={historyFor?.id ?? null}
+        productName={historyFor?.name ?? ''}
+        onClose={() => setHistoryFor(null)}
+      />
 
       {canManage && (
         <ProductFormModal

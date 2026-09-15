@@ -58,7 +58,11 @@ class DatabaseUnavailableMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        from config.db_bootstrap import failure
+        from config.db_bootstrap import ensure_database, failure
+
+        # Повторная попытка: база могла быть недоступна в момент холодного
+        # старта (облачный Postgres просыпался из сна) и уже подняться.
+        ensure_database()
 
         detail = failure()
         if detail is not None:

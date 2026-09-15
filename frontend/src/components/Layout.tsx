@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/store/auth'
 import { Logo, LogoMark } from '@/components/Logo'
 import { useTheme } from '@/store/theme'
+import DemoModeBanner from '@/components/DemoModeBanner'
 
 interface NavItem {
   to: string
@@ -152,6 +153,7 @@ export default function Layout() {
       </header>
 
       <main className="flex-1 min-w-0 pt-14 pb-20 md:pt-0 md:pb-0">
+        <DemoModeBanner />
         <div className="p-4 md:p-6 max-w-7xl mx-auto">
           <Outlet />
         </div>

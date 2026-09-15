@@ -20,6 +20,10 @@ class Warehouse(TimeStampedModel):
     class Meta:
         verbose_name = "Склад"
         verbose_name_plural = "Склады"
+        # Порядок нужен постраничному выводу: без него база вольна отдавать
+        # строки как угодно, и один и тот же склад мог попасть на две страницы
+        # сразу, а другой — ни на одну.
+        ordering = ["name"]
 
     def __str__(self):
         return self.name

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Download, Loader2, Boxes } from 'lucide-react'
+import { Download, Loader2, Boxes, History } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useStock, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import StockBadge from '@/components/StockBadge'
+import ProductMovementsModal from '@/components/ProductMovementsModal'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import { formatDateTime, todayIso } from '@/lib/format'
 import { triggerDownload } from '@/lib/download'
@@ -14,6 +15,8 @@ export default function Stock() {
   const [params] = useSearchParams()
   const { data: warehouses } = useWarehouses()
   const [warehouseId, setWarehouseId] = useState<string>('')
+  /** Товар, чьи движения сейчас смотрят. */
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null)
   const [onlyLow, setOnlyLow] = useState(params.get('low_stock') === 'true')
   const [search, setSearch] = useState('')
   const { push } = useToast()
@@ -85,14 +88,23 @@ export default function Stock() {
         {isLoading && <SkeletonList rows={3} />}
         {!isLoading && rows.length === 0 && <Card padded={false}><EmptyState icon={<Boxes size={20} />} title="Ничего не найдено" /></Card>}
         {rows.map((r) => (
-          <div key={r.id} className="rounded-2xl border border-line bg-surface p-3">
-            <div className="font-medium text-fg">{r.product_name}</div>
-            <div className="text-xs text-gray-400">{r.sku} · {r.warehouse_name}</div>
+          <button
+            key={r.id}
+            onClick={() => setHistoryFor({ id: r.product, name: r.product_name })}
+            className="w-full rounded-2xl border border-line bg-surface p-3 text-left transition-transform active:scale-[0.99]"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-medium text-fg">{r.product_name}</div>
+                <div className="text-xs text-fg-muted">{r.sku} · {r.warehouse_name}</div>
+              </div>
+              <History size={15} className="mt-0.5 shrink-0 text-fg-muted" />
+            </div>
             <div className="mt-2 flex items-center justify-between gap-2">
               <StockBadge status={r.status} quantity={r.quantity} />
-              <span className="text-xs text-gray-400">{formatDateTime(r.updated_at)}</span>
+              <span className="text-xs text-fg-muted">{formatDateTime(r.updated_at)}</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -104,14 +116,15 @@ export default function Stock() {
               <th className="text-left font-medium px-2 py-2.5">Склад</th>
               <th className="text-right font-medium px-4 py-2.5">Остаток</th>
               <th className="text-right font-medium px-4 py-2.5">Обновлено</th>
+              <th className="w-12" />
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {isLoading && (
-              <SkeletonRows rows={4} cols={4} />
+              <SkeletonRows rows={4} cols={5} />
             )}
             {!isLoading && rows.length === 0 && (
-              <tr><td colSpan={4} className="px-4 py-4"><EmptyState icon={<Boxes size={20} />} title="Ничего не найдено" /></td></tr>
+              <tr><td colSpan={5} className="px-4 py-4"><EmptyState icon={<Boxes size={20} />} title="Ничего не найдено" /></td></tr>
             )}
             {rows.map((r) => (
               <tr key={r.id}>
@@ -121,12 +134,29 @@ export default function Stock() {
                 </td>
                 <td className="px-2 py-2.5 text-gray-500">{r.warehouse_name}</td>
                 <td className="px-4 py-2.5 text-right"><StockBadge status={r.status} quantity={r.quantity} /></td>
-                <td className="px-4 py-2.5 text-right text-gray-400 text-xs">{formatDateTime(r.updated_at)}</td>
+                <td className="px-4 py-2.5 text-right text-xs text-fg-muted">{formatDateTime(r.updated_at)}</td>
+                <td className="pr-3 text-right">
+                  <div className="row-actions flex justify-end">
+                    <button
+                      onClick={() => setHistoryFor({ id: r.product, name: r.product_name })}
+                      title="Движения товара"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                    >
+                      <History size={14} />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <ProductMovementsModal
+        productId={historyFor?.id ?? null}
+        productName={historyFor?.name ?? ''}
+        onClose={() => setHistoryFor(null)}
+      />
     </div>
   )
 }

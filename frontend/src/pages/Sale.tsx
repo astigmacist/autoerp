@@ -7,6 +7,7 @@ import { useCurrentShift, useProductSearch, useWarehouses } from '@/api/queries'
 import { useAuth } from '@/store/auth'
 import { useToast } from '@/store/toast'
 import { formatMoney, formatQty } from '@/lib/format'
+import { useDebounced } from '@/lib/useDebounced'
 import Modal from '@/components/Modal'
 import ShiftBar from '@/components/ShiftBar'
 import type { PaymentMethod, ProductSearchResult, Sale } from '@/api/types'
@@ -117,7 +118,9 @@ export default function SalePage() {
   const qc = useQueryClient()
 
   const [query, setQuery] = useState('')
-  const { data: results, isFetching } = useProductSearch(query)
+  // Пауза перед запросом: сканер штрихкода «печатает» строку мгновенно, а
+  // человек — по букве, и каждая буква не должна лететь на сервер.
+  const { data: results, isFetching } = useProductSearch(useDebounced(query, 250))
   const [cart, setCart] = useState<CartLine[]>([])
   const [payMethod, setPayMethod] = useState<PaymentMethod>('cash')
   const [splitMode, setSplitMode] = useState(false)

@@ -6,6 +6,7 @@ import { useWarehouses, useWriteOffs } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import { formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
+import DocumentViewModal from '@/components/DocumentViewModal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { ProductSearchResult, Warehouse, WriteOff } from '@/api/types'
@@ -47,6 +48,8 @@ export default function WriteOffs() {
   const [saving, setSaving] = useState(false)
 
   const [confirmDoc, setConfirmDoc] = useState<WriteOff | null>(null)
+  /** Документ, состав которого сейчас смотрят. */
+  const [viewDoc, setViewDoc] = useState<WriteOff | null>(null)
   const [posting, setPosting] = useState(false)
 
   function openCreate() {
@@ -128,6 +131,7 @@ export default function WriteOffs() {
         {docs?.length === 0 && <Card padded={false}><EmptyState icon={<PackageMinus size={20} />} title="Списаний ещё не было" /></Card>}
         {docs?.map((d) => (
           <div key={d.id} className="rounded-2xl border border-line bg-surface p-3">
+            <button onClick={() => setViewDoc(d)} className="block w-full text-left">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-medium text-fg">{d.number}</div>
@@ -135,9 +139,10 @@ export default function WriteOffs() {
               </div>
               <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span>
             </div>
+            </button>
             {d.status === 'draft' && (
               <button
-                onClick={() => setConfirmDoc(d)}
+                onClick={(e) => { e.stopPropagation(); setConfirmDoc(d) }}
                 className="mt-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-700 transition-transform hover:bg-red-100 active:scale-[0.98] dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 h-11 w-full text-sm"
               >
                 Провести
@@ -163,7 +168,7 @@ export default function WriteOffs() {
             {isLoading && <SkeletonRows rows={4} cols={6} />}
             {docs?.length === 0 && <tr><td colSpan={6} className="px-4 py-4"><EmptyState icon={<PackageMinus size={20} />} title="Списаний ещё не было" /></td></tr>}
             {docs?.map((d) => (
-              <tr key={d.id}>
+              <tr key={d.id} onClick={() => setViewDoc(d)} className="cursor-pointer">
                 <td className="px-4 py-2.5 font-medium text-fg">{d.number}</td>
                 <td className="px-2 py-2.5 text-gray-500">{formatDate(d.date)}</td>
                 <td className="px-2 py-2.5 text-gray-500">{d.warehouse_name}</td>
@@ -171,7 +176,7 @@ export default function WriteOffs() {
                 <td className="px-2 py-2.5"><span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_CLS[d.status]}`}>{STATUS_LABELS[d.status]}</span></td>
                 <td className="px-4 py-2.5 text-right">
                   {d.status === 'draft' && (
-                    <button onClick={() => setConfirmDoc(d)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-700 transition-transform hover:bg-red-100 active:scale-[0.98] dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50">Провести</button>
+                    <button onClick={(e) => { e.stopPropagation(); setConfirmDoc(d) }} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-700 transition-transform hover:bg-red-100 active:scale-[0.98] dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50">Провести</button>
                   )}
                 </td>
               </tr>
@@ -252,6 +257,41 @@ export default function WriteOffs() {
           </section>
         </div>
       </Modal>
+
+      <DocumentViewModal
+        open={!!viewDoc}
+        onClose={() => setViewDoc(null)}
+        title={`Списание ${viewDoc?.number ?? ''}`}
+        meta={[
+          { label: 'Дата', value: viewDoc ? formatDate(viewDoc.date) : '' },
+          { label: 'Склад', value: viewDoc?.warehouse_name ?? '' },
+          { label: 'Причина', value: viewDoc?.reason_text || '— не указана —' },
+          { label: 'Статус', value: viewDoc ? STATUS_LABELS[viewDoc.status] : '' },
+        ]}
+        lines={(viewDoc?.items ?? []).map((i, idx) => ({
+          key: String(i.id ?? idx),
+          title: i.product_name ?? '',
+          right: `${formatQty(i.quantity)} шт`,
+        }))}
+        totals={[
+          { label: 'Позиций:', value: String(viewDoc?.items.length ?? 0) },
+          {
+            label: 'Единиц:',
+            value: formatQty((viewDoc?.items ?? []).reduce((s, i) => s + Number(i.quantity), 0)),
+            strong: true,
+          },
+        ]}
+        footer={
+          viewDoc?.status === 'draft' ? (
+            <button
+              onClick={() => { const doc = viewDoc; setViewDoc(null); setConfirmDoc(doc) }}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+            >
+              Провести
+            </button>
+          ) : null
+        }
+      />
 
       <Modal open={!!confirmDoc} onClose={() => !posting && setConfirmDoc(null)} title="Провести списание?"
         footer={

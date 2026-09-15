@@ -6,6 +6,7 @@ import { useTransfers, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import { formatQty, formatDate, todayIso } from '@/lib/format'
 import Modal from '@/components/Modal'
+import DocumentViewModal from '@/components/DocumentViewModal'
 import AddProductBar from '@/components/AddProductBar'
 import WarehouseTabs from '@/components/WarehouseTabs'
 import type { ProductSearchResult, Transfer, TransferSuggestion, Warehouse } from '@/api/types'
@@ -54,6 +55,8 @@ export default function Transfers() {
   const [suggesting, setSuggesting] = useState(false)
 
   const [confirmDoc, setConfirmDoc] = useState<Transfer | null>(null)
+  /** Документ, состав которого сейчас смотрят. */
+  const [viewDoc, setViewDoc] = useState<Transfer | null>(null)
   const [posting, setPosting] = useState(false)
 
   function openCreate() {
@@ -166,6 +169,7 @@ export default function Transfers() {
         {transfers?.length === 0 && <Card padded={false}><EmptyState icon={<ArrowLeftRight size={20} />} title="Перемещений ещё нет" /></Card>}
         {transfers?.map((t) => (
           <div key={t.id} className="rounded-2xl border border-line bg-surface p-3">
+            <button onClick={() => setViewDoc(t)} className="block w-full text-left">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="font-medium text-fg">{t.number}</div>
@@ -173,9 +177,10 @@ export default function Transfers() {
               </div>
               <span className={`text-xs rounded-full px-2 py-0.5 shrink-0 ${STATUS_CLS[t.status]}`}>{STATUS_LABELS[t.status]}</span>
             </div>
+            </button>
             {t.status === 'draft' && (
               <button
-                onClick={() => setConfirmDoc(t)}
+                onClick={(e) => { e.stopPropagation(); setConfirmDoc(t) }}
                 className="mt-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 h-11 w-full text-sm"
               >
                 Провести
@@ -202,7 +207,7 @@ export default function Transfers() {
             {isLoading && <SkeletonRows rows={4} cols={7} />}
             {transfers?.length === 0 && <tr><td colSpan={7} className="px-4 py-4"><EmptyState icon={<ArrowLeftRight size={20} />} title="Перемещений ещё нет" /></td></tr>}
             {transfers?.map((t) => (
-              <tr key={t.id}>
+              <tr key={t.id} onClick={() => setViewDoc(t)} className="cursor-pointer">
                 <td className="px-4 py-2.5 font-medium text-fg">{t.number}</td>
                 <td className="px-2 py-2.5 text-gray-500">{formatDate(t.date)}</td>
                 <td className="px-2 py-2.5 text-gray-500">{t.from_warehouse_name}</td>
@@ -211,7 +216,7 @@ export default function Transfers() {
                 <td className="px-2 py-2.5"><span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_CLS[t.status]}`}>{STATUS_LABELS[t.status]}</span></td>
                 <td className="px-4 py-2.5 text-right">
                   {t.status === 'draft' && (
-                    <button onClick={() => setConfirmDoc(t)} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50">Провести</button>
+                    <button onClick={(e) => { e.stopPropagation(); setConfirmDoc(t) }} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50">Провести</button>
                   )}
                 </td>
               </tr>
@@ -302,6 +307,41 @@ export default function Transfers() {
           </section>
         </div>
       </Modal>
+
+      <DocumentViewModal
+        open={!!viewDoc}
+        onClose={() => setViewDoc(null)}
+        title={`Перемещение ${viewDoc?.number ?? ''}`}
+        meta={[
+          { label: 'Дата', value: viewDoc ? formatDate(viewDoc.date) : '' },
+          { label: 'Откуда', value: viewDoc?.from_warehouse_name ?? '' },
+          { label: 'Куда', value: viewDoc?.to_warehouse_name ?? '' },
+          { label: 'Статус', value: viewDoc ? STATUS_LABELS[viewDoc.status] : '' },
+        ]}
+        lines={(viewDoc?.items ?? []).map((i, idx) => ({
+          key: String(i.id ?? idx),
+          title: i.product_name ?? '',
+          right: `${formatQty(i.quantity)} шт`,
+        }))}
+        totals={[
+          { label: 'Позиций:', value: String(viewDoc?.items.length ?? 0) },
+          {
+            label: 'Единиц:',
+            value: formatQty((viewDoc?.items ?? []).reduce((s, i) => s + Number(i.quantity), 0)),
+            strong: true,
+          },
+        ]}
+        footer={
+          viewDoc?.status === 'draft' ? (
+            <button
+              onClick={() => { const doc = viewDoc; setViewDoc(null); setConfirmDoc(doc) }}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-gray-900 px-4 text-sm font-semibold text-white transition-transform hover:bg-gray-800 active:scale-[0.98] dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white"
+            >
+              Провести
+            </button>
+          ) : null
+        }
+      />
 
       <Modal open={!!confirmDoc} onClose={() => !posting && setConfirmDoc(null)} title="Провести перемещение?"
         footer={

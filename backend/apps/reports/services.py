@@ -182,22 +182,33 @@ def discounts_report(date_from, date_to):
 
 
 def dead_stock_report(days=90):
-    from apps.catalog.models import Product
+    """Товары, которые лежат на складе и не продавались N дней.
 
+    Считаем по товару, а не по складу: владельца интересует позиция целиком,
+    а не то, что она разложена по двум полкам. Раньше один и тот же товар
+    появлялся в списке дважды — строкой на каждый склад.
+    """
     cutoff = timezone.now() - timedelta(days=days)
     recently_sold_ids = set(
         SaleItem.objects.filter(sale__created_at__gte=cutoff).values_list("product_id", flat=True)
     )
-    result = []
+    by_product: dict = {}
     for stock in Stock.objects.select_related("product").filter(quantity__gt=0):
         if stock.product_id in recently_sold_ids:
             continue
-        result.append({
-            "product_id": stock.product_id,
-            "product_name": stock.product.name,
-            "sku": stock.product.sku,
-            "quantity": stock.quantity,
-            "frozen_amount": stock.quantity * stock.product.avg_cost,
-        })
+        row = by_product.setdefault(
+            stock.product_id,
+            {
+                "product_id": stock.product_id,
+                "product_name": stock.product.name,
+                "sku": stock.product.sku,
+                "quantity": Decimal("0"),
+                "frozen_amount": Decimal("0"),
+            },
+        )
+        row["quantity"] += stock.quantity
+        row["frozen_amount"] += stock.quantity * stock.product.avg_cost
+
+    result = list(by_product.values())
     result.sort(key=lambda r: r["frozen_amount"], reverse=True)
     return result

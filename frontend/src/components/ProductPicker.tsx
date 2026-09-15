@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Search, Loader2, PackagePlus } from 'lucide-react'
 import { useProductSearch } from '@/api/queries'
+import { useDebounced } from '@/lib/useDebounced'
 import { formatMoney, formatQty } from '@/lib/format'
 import type { ProductSearchResult } from '@/api/types'
 import { fieldClass } from '@/components/ui'
@@ -14,7 +15,7 @@ interface Props {
 
 export default function ProductPicker({ onSelect, placeholder, onCreateNew }: Props) {
   const [query, setQuery] = useState('')
-  const { data: results, isFetching } = useProductSearch(query)
+  const { data: results, isFetching } = useProductSearch(useDebounced(query, 250))
 
   return (
     <div className="relative">

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path, re_path
@@ -7,7 +8,19 @@ from config.spa import spa_index
 
 
 def health(request):
-    return JsonResponse({"status": "ok"})
+    """Состояние приложения и — главное — где лежат данные.
+
+    Интерфейс спрашивает это при загрузке: если база временная, продавец
+    должен узнать об этом из честной полосы наверху, а не из пропавшего
+    за ночь прихода.
+    """
+    return JsonResponse(
+        {
+            "status": "ok",
+            "storage": "ephemeral" if settings.STORAGE_IS_EPHEMERAL else "persistent",
+            "database": "postgresql" if "postgresql" in settings.DATABASES["default"]["ENGINE"] else "sqlite",
+        }
+    )
 
 
 urlpatterns = [
