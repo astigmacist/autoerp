@@ -26,7 +26,10 @@ class PermissionsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from apps.core.models import AppSettings
+
         u = request.user
+        settings_obj = AppSettings.load()
         return Response(
             {
                 "role": u.role,
@@ -34,5 +37,8 @@ class PermissionsView(APIView):
                 "can_manage_catalog": u.role in ("owner", "stock"),
                 "can_manage_users": u.role == "owner",
                 "discount_limit_percent": u.discount_limit_percent,
+                # Название магазина нужно интерфейсу — прежде всего чеку,
+                # который покупатель уносит с собой.
+                "store_name": settings_obj.store_name,
             }
         )

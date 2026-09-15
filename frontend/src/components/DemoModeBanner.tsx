@@ -41,7 +41,7 @@ export default function DemoModeBanner() {
 
   return (
     <>
-      <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 md:px-6 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+      <div className="no-print flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 md:px-6 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
         <AlertTriangle size={14} className="mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <span className="font-semibold">Демо-режим.</span> Данные хранятся временно и пропадут при

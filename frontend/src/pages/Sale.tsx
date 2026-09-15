@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Percent, X, ShoppingCart } from 'lucide-react'
+import { Search, Trash2, Plus, Minus, Loader2, AlertTriangle, RotateCcw, Percent, X, ShoppingCart, CheckCircle2, Printer } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useCurrentShift, useProductSearch, useWarehouses } from '@/api/queries'
 import { useAuth } from '@/store/auth'
@@ -133,6 +134,8 @@ export default function SalePage() {
   const [discountFor, setDiscountFor] = useState<string | null>(null)
   /** На телефоне каталог и чек не помещаются рядом — это две вкладки. */
   const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog')
+  /** Последняя проведённая продажа — чтобы сразу распечатать чек. */
+  const [lastSale, setLastSale] = useState<Sale | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
   function focusSearch() {
@@ -247,6 +250,7 @@ export default function SalePage() {
         payments,
       })
       push(`Продажа №${data.number} проведена`, 'success')
+      setLastSale(data)
       // Каталог кассы показывает остатки зала — после продажи они другие.
       qc.invalidateQueries({ queryKey: ['product-search'] })
       qc.invalidateQueries({ queryKey: ['stock'] })
@@ -268,6 +272,35 @@ export default function SalePage() {
   return (
     <div className="space-y-4">
       <ShiftBar />
+
+      {/* Только что пробили продажу — чек нужен покупателю сейчас, а не через
+          журнал. Полоса уходит, как только в корзину попадает следующий товар. */}
+      {lastSale && cart.length === 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+          <CheckCircle2 size={18} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="min-w-0 flex-1 text-sm">
+            <span className="font-semibold text-emerald-800 dark:text-emerald-200">
+              Продажа {lastSale.number} проведена
+            </span>
+            <span className="ml-2 tabular-nums text-emerald-700 dark:text-emerald-300">
+              {formatMoney(lastSale.total)}
+            </span>
+          </div>
+          <Link
+            to={`/sales/${lastSale.id}`}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-surface px-3 text-sm font-semibold text-emerald-700 transition-transform hover:bg-emerald-100 active:scale-[0.98] dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+          >
+            <Printer size={14} /> Чек
+          </Link>
+          <button
+            onClick={() => setLastSale(null)}
+            aria-label="Скрыть"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {/* На телефоне каталог и чек — две вкладки: иначе чек уезжает под
           длинный список товаров, и до итога надо прокручивать всю витрину. */}
@@ -335,7 +368,7 @@ export default function SalePage() {
               {searching ? 'Ничего не найдено — проверьте код или название' : 'В зале пока нет товаров'}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 2xl:grid-cols-2">
               {results.map((p) => {
                 const inCart = cartQty(p.id)
                 const soldOut = p.shop_qty <= 0

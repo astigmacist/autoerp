@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Loader2, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Loader2, Printer, RotateCcw } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
 import { useAuth } from '@/store/auth'
 import { useToast } from '@/store/toast'
 import { formatDateTime, formatMoney, formatQty } from '@/lib/format'
 import Modal from '@/components/Modal'
+import SaleReceipt from '@/components/SaleReceipt'
 import type { Payment, PaymentMethod, Sale } from '@/api/types'
 import { fieldClass } from '@/components/ui'
 
@@ -74,12 +75,23 @@ export default function SaleDetail() {
   const canReturn = sale.status === 'completed' || sale.status === 'partially_returned'
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <button onClick={() => navigate('/sales')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
-        <ArrowLeft size={16} /> К журналу продаж
-      </button>
+    <div className="max-w-2xl space-y-4">
+      {/* Чек виден только на бумаге — правила печати в index.css */}
+      <SaleReceipt sale={sale} storeName={permissions?.store_name ?? 'AutoZap'} />
 
-      <div className="rounded-2xl border border-line bg-surface p-5">
+      <div className="no-print flex flex-wrap items-center justify-between gap-2">
+        <button onClick={() => navigate('/sales')} className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg">
+          <ArrowLeft size={16} /> К журналу продаж
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-surface px-3 text-sm font-semibold text-fg transition-transform hover:bg-surface-muted active:scale-[0.98]"
+        >
+          <Printer size={15} /> Печать чека
+        </button>
+      </div>
+
+      <div className="no-print rounded-2xl border border-line bg-surface p-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-lg font-semibold text-fg">{sale.number}</h1>

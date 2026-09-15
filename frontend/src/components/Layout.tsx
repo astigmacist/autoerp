@@ -102,7 +102,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex bg-canvas">
       {/* Боковая панель — только на большом экране */}
-      <aside className="hidden md:flex w-60 flex-col border-r border-line bg-surface shrink-0">
+      <aside className="no-print hidden md:flex w-60 flex-col border-r border-line bg-surface shrink-0">
         <div className="flex h-16 items-center px-4">
           <Logo />
         </div>
@@ -144,7 +144,7 @@ export default function Layout() {
       </aside>
 
       {/* Верхняя полоса — только на телефоне */}
-      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface/90 backdrop-blur border-b border-line flex items-center justify-between pl-4 pr-2">
+      <header className="no-print md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface/90 backdrop-blur border-b border-line flex items-center justify-between pl-4 pr-2">
         <div className="flex items-center gap-2.5">
           <LogoMark size={28} />
           <span className="font-semibold text-fg">{current?.label ?? 'AutoZap'}</span>
@@ -161,7 +161,7 @@ export default function Layout() {
 
       {/* Нижняя панель — основной способ навигации на телефоне: до неё легко
           дотянуться большим пальцем, в отличие от бокового меню за «гамбургером». */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
+      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
         <div className="flex">
           {primary.map((item) => (
             <NavLink

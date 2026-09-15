@@ -15,6 +15,7 @@ export interface Permissions {
   can_manage_catalog: boolean
   can_manage_users: boolean
   discount_limit_percent: number | null
+  store_name?: string
 }
 
 export interface Warehouse {

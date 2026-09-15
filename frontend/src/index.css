@@ -217,3 +217,18 @@ tbody tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 @media (hover: none) {
   tbody tr .row-actions { opacity: 1; }
 }
+
+/* Печать. На бумагу идёт только чек: меню, кнопки и вся навигация к делу не
+   относятся, а тёмная тема на белом листе — это чёрный прямоугольник. */
+@media print {
+  :root, .dark {
+    --canvas: #ffffff;
+    --surface: #ffffff;
+    --fg: #000000;
+  }
+  html, body { background: #fff !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  main { padding: 0 !important; }
+  @page { margin: 8mm; }
+}
