@@ -6,7 +6,7 @@ import { useBrands, useCategories } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import Modal from '@/components/Modal'
 import type { Product } from '@/api/types'
-import { MoneyField, fieldClass } from '@/components/ui'
+import { MoneyField, NumericInput, fieldClass } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -298,10 +298,12 @@ export default function ProductFormModal({ open, onClose, product, initialName, 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-medium text-fg-muted">Порог дефицита</label>
-              <input
-                inputMode="numeric"
-                value={form.min_stock}
-                onChange={(e) => set('min_stock', e.target.value)}
+              <NumericInput
+                value={form.min_stock === '' ? '' : Number(form.min_stock)}
+                onChange={(v) => set('min_stock', v === '' ? '' : String(v))}
+                label="Порог дефицита"
+                suffix="шт"
+                min={0}
                 className={`mt-1 ${fieldClass} h-11 md:h-10 tabular-nums`}
               />
               <div className="mt-1 text-xs text-fg-muted">Меньше этого остатка — товар подсветится как дефицит</div>

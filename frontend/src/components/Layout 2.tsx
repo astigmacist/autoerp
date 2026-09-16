@@ -2,7 +2,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Package, Warehouse, Receipt,
   BarChart3, LogOut, MoreHorizontal, X, Sun, Moon, type LucideIcon,
-  SlidersHorizontal,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/store/auth'
@@ -26,7 +25,6 @@ const NAV: NavItem[] = [
   { to: '/stock', label: 'Склад', icon: Warehouse, roles: ['owner', 'stock'] },
   { to: '/sales', label: 'Продажи', icon: Receipt, roles: ['owner', 'stock', 'seller'] },
   { to: '/reports', label: 'Отчёты', icon: BarChart3, roles: ['owner', 'stock'] },
-  { to: '/settings', label: 'Настройки', icon: SlidersHorizontal, roles: ['owner', 'stock', 'seller'] },
 ]
 
 /** Сколько пунктов помещается в нижнюю панель до кнопки «Ещё». */
@@ -91,22 +89,8 @@ export default function Layout() {
   }
 
   const items = NAV.filter((i) => !user || i.roles.includes(user.role))
+  const primary = items.slice(0, BOTTOM_BAR_SLOTS)
   const secondary = items.slice(BOTTOM_BAR_SLOTS)
-
-  // Касса — посередине нижней панели. Это самая частая операция за день, а
-  // середина — единственное место, куда большой палец дотягивается и с левой,
-  // и с правой руки, не перехватывая телефон. Пять слотов (четыре раздела и
-  // «Ещё»), середина — третий.
-  const primary = (() => {
-    const list = items.slice(0, BOTTOM_BAR_SLOTS)
-    const till = list.findIndex((i) => i.to === '/sale')
-    if (till < 0) return list
-    const middle = Math.floor(BOTTOM_BAR_SLOTS / 2) // 2 из четырёх: третий слот из пяти
-    const reordered = [...list]
-    const [item] = reordered.splice(till, 1)
-    reordered.splice(middle, 0, item)
-    return reordered
-  })()
 
   // Сравнение по сегментам пути: иначе «/sales» попадал в пункт «/sale»
   // и журнал продаж подписывался словом «Продажа».
@@ -118,7 +102,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex bg-canvas">
       {/* Боковая панель — только на большом экране */}
-      <aside className="no-print hidden md:flex w-60 flex-col border-r border-line bg-surface shrink-0">
+      <aside className="hidden md:flex w-60 flex-col border-r border-line bg-surface shrink-0">
         <div className="flex h-16 items-center px-4">
           <Logo />
         </div>
@@ -160,7 +144,7 @@ export default function Layout() {
       </aside>
 
       {/* Верхняя полоса — только на телефоне */}
-      <header className="no-print md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface/90 backdrop-blur border-b border-line flex items-center justify-between pl-4 pr-2">
+      <header className="md:hidden fixed top-0 inset-x-0 z-40 h-14 bg-surface/90 backdrop-blur border-b border-line flex items-center justify-between pl-4 pr-2">
         <div className="flex items-center gap-2.5">
           <LogoMark size={28} />
           <span className="font-semibold text-fg">{current?.label ?? 'AutoZap'}</span>
@@ -177,7 +161,7 @@ export default function Layout() {
 
       {/* Нижняя панель — основной способ навигации на телефоне: до неё легко
           дотянуться большим пальцем, в отличие от бокового меню за «гамбургером». */}
-      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
         <div className="flex">
           {primary.map((item) => (
             <NavLink
@@ -190,27 +174,16 @@ export default function Layout() {
                 }`
               }
             >
-              {({ isActive }) => {
-                const isTill = item.to === '/sale'
-                return (
-                  <>
-                    <span
-                      className={`flex items-center justify-center rounded-lg ${
-                        isTill ? 'h-9 w-14' : 'h-7 w-12'
-                      } ${
-                        isActive
-                          ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
-                          : isTill
-                            ? 'bg-brand-500/12 text-brand-600 dark:text-brand-400'
-                            : ''
-                      }`}
-                    >
-                      <item.icon size={isTill ? 21 : 18} />
-                    </span>
-                    {item.label}
-                  </>
-                )
-              }}
+              {({ isActive }) => (
+                <>
+                  <span className={`flex h-7 w-12 items-center justify-center rounded-lg ${
+                    isActive ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900' : ''
+                  }`}>
+                    <item.icon size={18} />
+                  </span>
+                  {item.label}
+                </>
+              )}
             </NavLink>
           ))}
           <button

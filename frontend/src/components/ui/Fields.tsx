@@ -1,8 +1,14 @@
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
+import NumericInput from './NumericInput'
 
 const UNIT_LABELS: Record<string, string> = { pcs: 'шт', set: 'компл', l: 'л', kg: 'кг' }
+
+/** Число с разрядами, но без лишних нулей: 1 200 и 1,5 одинаково читаемы. */
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 3 }).format(value)
+}
 
 export function unitLabel(unit?: string): string {
   return UNIT_LABELS[unit ?? 'pcs'] ?? 'шт'
@@ -15,14 +21,13 @@ export function unitLabel(unit?: string): string {
  * рамка, кнопки «плюс/минус» и единица измерения рядом с числом.
  */
 export function QtyField({
-  value, onChange, unit, label = 'Количество', max, autoFocus, hint, tone,
+  value, onChange, unit, label = 'Количество', max, hint, tone,
 }: {
   value: number
   onChange: (value: number) => void
   unit?: string
   label?: string
   max?: number
-  autoFocus?: boolean
   hint?: ReactNode
   tone?: 'warning'
 }) {
@@ -49,12 +54,15 @@ export function QtyField({
         >
           <Minus size={14} />
         </button>
-        <input
-          inputMode="decimal"
-          autoFocus={autoFocus}
+        <NumericInput
           value={value}
-          onChange={(e) => onChange(clamp(parseFloat(e.target.value) || 0))}
-          aria-label={label}
+          onChange={(v) => onChange(clamp(typeof v === 'number' ? v : 0))}
+          label={label}
+          suffix={unitLabel(unit)}
+          allowDecimal={unit !== 'pcs' && unit !== 'set'}
+          min={0}
+          max={max}
+          format={(v) => formatNumber(v)}
           className="h-11 min-w-0 flex-1 border-x border-line-strong bg-transparent text-center text-sm font-semibold tabular-nums text-fg outline-none focus-visible:outline-none md:h-10"
         />
         <button
@@ -91,12 +99,14 @@ export function MoneyField({
     <div>
       <div className="mb-1.5 text-xs font-medium text-fg-muted">{label}</div>
       <div className="relative">
-        <input
-          inputMode="numeric"
+        <NumericInput
           value={value}
+          onChange={onChange}
+          label={label}
+          suffix="₸"
+          quickAdd={[500, 1000, 5000]}
+          min={0}
           placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-          aria-label={label}
           className={clsx(
             'h-11 w-full rounded-xl border bg-surface pr-7 pl-3 text-right text-sm font-semibold tabular-nums outline-none md:h-10',
             'placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500',

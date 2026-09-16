@@ -6,6 +6,7 @@ import { useCurrentShift, useWarehouses } from '@/api/queries'
 import { useToast } from '@/store/toast'
 import { formatMoney, formatDateTime } from '@/lib/format'
 import Modal from '@/components/Modal'
+import { NumericInput } from '@/components/ui'
 import type { Shift } from '@/api/types'
 
 export default function ShiftBar() {
@@ -124,11 +125,15 @@ export default function ShiftBar() {
           <p className="text-sm text-gray-500">Склад: {shop?.name ?? '—'}</p>
           <div>
             <label className="text-xs font-medium text-fg-muted">Наличные в кассе на начало смены</label>
-            <input
-              type="number"
-              value={cashStart}
-              onChange={(e) => setCashStart(e.target.value)}
-              autoFocus
+            <NumericInput
+              value={cashStart === '' ? '' : Number(cashStart)}
+              onChange={(v) => setCashStart(v === '' ? '' : String(v))}
+              label="Наличные в кассе на начало смены"
+              suffix="₸"
+              hint="Столько денег лежит в ящике прямо сейчас"
+              quickAdd={[1000, 5000, 10000]}
+              min={0}
+              placeholder="0"
               className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
             />
           </div>
@@ -156,11 +161,14 @@ export default function ShiftBar() {
           </p>
           <div>
             <label className="text-xs font-medium text-fg-muted">Фактически наличных в кассе</label>
-            <input
-              type="number"
-              value={cashFact}
-              onChange={(e) => setCashFact(e.target.value)}
-              autoFocus
+            <NumericInput
+              value={cashFact === '' ? '' : Number(cashFact)}
+              onChange={(v) => setCashFact(v === '' ? '' : String(v))}
+              label="Фактически наличных в кассе"
+              suffix="₸"
+              hint="Пересчитайте ящик и введите, сколько получилось"
+              quickAdd={[1000, 5000, 10000]}
+              min={0}
               placeholder="0"
               className="w-full mt-1 rounded-xl border border-line-strong bg-transparent px-3 py-2 text-sm tabular-nums outline-none"
             />
@@ -180,12 +188,24 @@ export default function ShiftBar() {
       >
         {closedResult && (
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-gray-500">
+            <div className="flex justify-between text-fg-muted">
               <span>Касса на начало</span>
               <span className="tabular-nums">{formatMoney(closedResult.cash_start)}</span>
             </div>
-            <div className="flex justify-between text-gray-500">
-              <span>Ожидалось по системе</span>
+            {/* Расшифровка: без неё «ожидалось по системе» — просто число,
+                и продавцу нечем объяснить расхождение. */}
+            <div className="flex justify-between text-fg-muted">
+              <span>Продажи наличными</span>
+              <span className="tabular-nums">+{formatMoney(closedResult.cash_sales_total ?? 0)}</span>
+            </div>
+            {parseFloat(String(closedResult.cash_refunds_total ?? 0)) > 0 && (
+              <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                <span>Возвраты наличными</span>
+                <span className="tabular-nums">−{formatMoney(closedResult.cash_refunds_total ?? 0)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-line pt-2 text-fg-muted">
+              <span>Должно быть в кассе</span>
               <span className="tabular-nums">{formatMoney(closedResult.cash_end_system ?? 0)}</span>
             </div>
             <div className="flex justify-between font-medium text-fg">

@@ -14,26 +14,9 @@ say()  { printf '%s\n' "${BLUE}▸ $1${OFF}"; }
 ok()   { printf '%s\n' "${GREEN}✓ $1${OFF}"; }
 fail() { printf '%s\n' "${RED}✗ $1${OFF}"; exit 1; }
 
-# Занят ли порт. Проверяем попыткой подключиться: если кто-то слушает —
-# соединение установится. lsof и netstat для этого не нужны.
-is_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$1") >/dev/null 2>&1; }
+PORT="${PORT:-8000}"
 
 printf '\n%s\n\n' "${BLUE}AutoZap ERP — локальный запуск${OFF}"
-
-# ── 0. Свободный порт ────────────────────────────────────────────────────────
-# На 8000 часто сидит что-то другое (прошлый запуск, соседний проект). Просить
-# владельца магазина разбираться с портами — плохая идея: берём соседний.
-PORT="${PORT:-8000}"
-WANTED="$PORT"
-while is_busy "$PORT" && [ "$PORT" -lt $((WANTED + 20)) ]; do
-  PORT=$((PORT + 1))
-done
-is_busy "$PORT" && fail "Порты с ${WANTED} по $((WANTED + 20)) заняты.
-Освободите ${WANTED} и запустите снова — в Терминале:
-  lsof -ti:${WANTED} | xargs kill"
-if [ "$PORT" != "$WANTED" ]; then
-  say "Порт ${WANTED} занят другой программой — беру ${PORT}"
-fi
 
 # ── 1. Python ────────────────────────────────────────────────────────────────
 command -v python3 >/dev/null 2>&1 || fail "Не найден python3.
@@ -53,17 +36,9 @@ source venv/bin/activate
 
 if [ ! -f venv/.deps-installed ] || [ requirements.txt -nt venv/.deps-installed ]; then
   say "Устанавливаю библиотеки"
-  # Вывод прячем в файл: pip сыплет предупреждениями про свой старый кэш
-  # («Cache entry deserialization failed»), которые ни на что не влияют, но
-  # выглядят как поломка. Если установка действительно упадёт — покажем.
-  PIP_LOG="venv/pip-install.log"
-  pip install --quiet --upgrade pip > "$PIP_LOG" 2>&1 || true
-  if ! pip install --quiet -r requirements.txt >> "$PIP_LOG" 2>&1; then
-    grep -v 'Cache entry deserialization failed' "$PIP_LOG" | tail -25
-    fail "Не удалось установить библиотеки.
-Проверьте интернет и запустите файл снова.
-Полный лог: backend/${PIP_LOG}"
-  fi
+  pip install --quiet --upgrade pip
+  pip install --quiet -r requirements.txt || fail "Не удалось установить библиотеки.
+Проверьте интернет и запустите файл снова."
   touch venv/.deps-installed
 fi
 ok "Окружение готово"

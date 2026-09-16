@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Loader2, Printer, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Loader2, Minus, Plus, Printer, RotateCcw } from 'lucide-react'
 import { api, getApiError } from '@/api/client'
+import { useAppSettings } from '@/api/queries'
 import { useAuth } from '@/store/auth'
 import { useToast } from '@/store/toast'
 import { formatDateTime, formatMoney, formatQty } from '@/lib/format'
 import Modal from '@/components/Modal'
 import SaleReceipt from '@/components/SaleReceipt'
 import type { Payment, PaymentMethod, Sale } from '@/api/types'
-import { fieldClass } from '@/components/ui'
+import { NumericInput, fieldClass } from '@/components/ui'
 
 const PAYMENT_LABELS: Record<PaymentMethod, string> = { cash: 'Наличные', kaspi_qr: 'Kaspi QR', card: 'Карта', transfer: 'Перевод' }
 const STATUS_LABELS: Record<string, string> = {
@@ -20,6 +21,9 @@ export default function SaleDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { permissions } = useAuth()
+  // Название магазина берём из настроек, а не из прав: тогда изменение в
+  // «Настройках» видно в чеке сразу, а не после следующего входа.
+  const { data: shopSettings } = useAppSettings()
   const { push } = useToast()
   const qc = useQueryClient()
 
@@ -77,7 +81,7 @@ export default function SaleDetail() {
   return (
     <div className="max-w-2xl space-y-4">
       {/* Чек виден только на бумаге — правила печати в index.css */}
-      <SaleReceipt sale={sale} storeName={permissions?.store_name ?? 'AutoZap'} />
+      <SaleReceipt sale={sale} storeName={shopSettings?.store_name ?? 'AutoZap'} />
 
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <button onClick={() => navigate('/sales')} className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-fg">
@@ -116,19 +120,39 @@ export default function SaleDetail() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="text-sm font-semibold tabular-nums">{formatMoney(i.amount)}</div>
+                  {/* Сколько вернуть — такой же степпер, как во всех остальных
+                      документах: в этом месте оставался последний в системе
+                      голый `input type=number` со стрелочками. */}
                   {canReturn && rem > 0 && (
-                    <input
-                      type="number"
-                      min={0}
-                      max={rem}
-                      placeholder="0"
-                      value={returnQty[i.id] || ''}
-                      onChange={(e) => {
-                        const v = Math.max(0, Math.min(rem, parseFloat(e.target.value) || 0))
-                        setReturnQty((prev) => ({ ...prev, [i.id]: v }))
-                      }}
-                      className="w-16 text-right rounded-lg border border-line-strong bg-transparent px-2 py-1 text-sm tabular-nums outline-none"
-                    />
+                    <div className="flex items-center rounded-lg border border-line-strong">
+                      <button
+                        onClick={() => setReturnQty((prev) => ({ ...prev, [i.id]: Math.max(0, (prev[i.id] || 0) - 1) }))}
+                        aria-label="Меньше"
+                        className="flex h-9 w-9 items-center justify-center rounded-l-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <NumericInput
+                        value={returnQty[i.id] || 0}
+                        onChange={(v) => {
+                          const qty = Math.max(0, Math.min(rem, typeof v === 'number' ? v : 0))
+                          setReturnQty((prev) => ({ ...prev, [i.id]: qty }))
+                        }}
+                        label="Сколько вернуть"
+                        suffix="шт"
+                        hint={`Продано ${formatQty(i.quantity)}, можно вернуть ${formatQty(rem)}`}
+                        min={0}
+                        max={rem}
+                        className="h-9 w-10 border-x border-line-strong bg-transparent text-center text-sm tabular-nums text-fg outline-none focus-visible:outline-none"
+                      />
+                      <button
+                        onClick={() => setReturnQty((prev) => ({ ...prev, [i.id]: Math.min(rem, (prev[i.id] || 0) + 1) }))}
+                        aria-label="Больше"
+                        className="flex h-9 w-9 items-center justify-center rounded-r-lg text-fg-muted hover:bg-surface-muted hover:text-fg"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
